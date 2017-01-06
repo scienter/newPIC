@@ -1,0 +1,116 @@
+[Save]
+ field_save=ON
+ particle_save=ON
+ density_save=OFF
+ dump_save=OFF
+
+ field_format=TXT
+ particle_format=TXT
+ density_format=TXT
+ dump_format=HDF
+
+ dump_start=10000
+
+[Domain]
+
+ dimension=2
+ current_order=1
+ interpolation_order=2
+ field_type=Pukhov
+
+ max_time=2600		//[minute]
+ max_step=200
+ save_step=200
+ save_start=200
+
+ L=1
+ M=1
+ N=1
+
+ moving_domain=ON
+
+ minX=0
+ maxX=40e-6
+ minY=-25e-6
+ maxY=25e-6
+ minZ=-25e-6
+ maxZ=25e-6
+ lambda=1e-6
+ division_lambda=20	// dx is [wavelength/divisionLambda]
+ dy_over_dx = 10
+ dt_ratio = 0.99
+
+ resolution_rate_X=1
+ resolution_rate_Y=1
+ 
+
+ boost_gamma=1
+ filter=0
+ filter_step=2
+
+ pml=ON
+ pml_cells=1
+ pml_r=0.2
+ pml_d=0.4
+
+[Laser]
+ wavelength=1e-6
+ a0=1
+ rU=4			//number of wave lenth
+ rD=4
+ flat=0
+ retard=0
+ polarity=2
+ loadPositionX=0e-5		//laser start position [m]
+ loadPositionY=0.0e-5		//laser start position [m]
+ beamWaist=8e-6
+ focus=40e-6
+
+
+[External]
+ Ex=0
+ Ey=0
+ Ez=0
+ Bx=0
+ By=0
+ Bz=0
+
+[Plasma]
+ species=Electron
+ type=Polygon
+ density=1e25
+ numberInCell=2
+ startIndex=0		//The starting particle index
+ temperature=0
+
+ Xnodes=4
+ X0=0.89e-5
+ X1=0.89e-5
+ X2=0.9e-5
+ X3=0.9e-5
+ Xn0=0
+ Xn1=1
+ Xn2=1
+ Xn3=0
+
+ Ynodes=4
+ Y0=0e-5
+ Y1=0e-5
+ Y2=0.1e-5
+ Y3=0.1e-5
+ Yn0=0
+ Yn1=1
+ Yn2=1
+ Yn3=0
+
+ Znodes=4
+ Z0=-20e-6
+ Z1=-19e-6
+ Z2=19e-6
+ Z3=20e-6
+ Zn0=0
+ Zn1=1
+ Zn2=1
+ Zn3=0
+
+

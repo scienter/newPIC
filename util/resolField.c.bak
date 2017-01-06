@@ -1,0 +1,787 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "mpi.h"
+#include <time.h>
+#include "hdf5.h"
+#include "hdf5_hl.h"
+
+
+void restoreIntMeta(char *fileName,char *dataName,int *data);
+void saveIntMeta(char *fileName,char *dataName,int *data);
+void restoreFieldComp(double ***data,char *fileName,char *dataName,int nx,int ny,int nz,int nxSub,int nySub,int nzSub,int istart,int iend,int jstart,int jend,int kstart,int kend,int *offSet);
+double ***memoryAsign(int nx, int ny, int nz);
+void deleteField(double ***field,int nx,int ny,int nz);
+void saveFieldComp(double ***data,char *fileName,char *dataName,int nx,int ny,int nz,int nxSub,int nySub,int nzSub,int istart,int iend,int jstart,int jend,int kstart,int kend,int *offSet);
+void resolCalX(double ***field,double ***reField,int istart,int iend,int jstart,int jend,int kstart,int kend,int resolX,int rankX,int edge);
+void resolCalY(double ***field,double ***reField,int istart,int iend,int jstart,int jend,int kstart,int kend,int resolY,int rankY,int edge);
+void calBField(double ***fieldOld,double ***fieldNow,double ***fieldNext,int istart,int iend,int jstart,int jend,int kstart,int kend,int resolX);
+void calParameter(int nx,int *istart,int *iend,int *saveNxSub,int rankX,int *biasX,int reIend,int reNxSub,int L);
+
+int main(int argc, char *argv[])
+{
+    int dimension,L,M,N,resolX,resolY,resolZ,step;
+    int nx,ny,nz,minX,maxX,minY,maxY,minZ,maxZ,nxSub,nySub,nzSub;
+    int i,j,k,s,rank,rankX,rankY,rankZ,offset[3],offSet[3];
+    int minXDomain,minYDomain,minZDomain,tmpInt;
+    int minXSub,maxXSub,minYSub,maxYSub,minZSub,maxZSub;
+    int istart,iend,jstart,jend,kstart,kend;
+    int reNx,reNy,reNz,reNxSub,reNySub,reNzSub,reIend,reJend,reKend;
+    int saveNxSub,saveNySub,saveNzSub,biasX,biasY,biasZ;
+    int saveIstart,saveJstart,saveKstart,saveIend,saveJend,saveKend;
+    int remainX,remainY,remainZ,subX,subY,subZ,tmpX,tmpY,tmpZ;
+    double ***fieldE,***reField,***reField1,***fieldOld,***fieldNow,***fieldNext;
+    FILE *out;
+    char fileName[100],dataName[100],outFile[100],fileName1[100];
+    hid_t file_id;
+    herr_t hdfstatus;
+
+    int myrank, nTasks;
+    MPI_Status status; 
+
+    MPI_Init(&argc,&argv);
+    MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+    if(argc < 8) 
+    {  
+      printf("mpirun -np N ./resolChange dimension step L M N resolX resolY resolZ\n"); 
+      exit(0); 
+    }
+
+    dimension=atoi(argv[1]);
+    step=atoi(argv[2]);
+    L=atoi(argv[3]);
+    M=atoi(argv[4]);
+    N=atoi(argv[5]);
+    resolX=atoi(argv[6]);
+    resolY=atoi(argv[7]);
+    resolZ=atoi(argv[8]);
+    if(L*M*N!=nTasks)  {
+      printf("check nTasks!. Now L=%d,M=%d,N=%d\n",L,M,N);
+      exit(0);
+    }
+
+
+    sprintf(fileName,"dumpE%d.h5",step);
+    restoreIntMeta(fileName,"/nx",&nx);
+    restoreIntMeta(fileName,"/minXDomain",&minXDomain);
+    ny=1;
+    nz=1;
+    minYDomain=minZDomain=0;
+    if(dimension>1)  {
+      restoreIntMeta(fileName,"/ny",&ny);
+      restoreIntMeta(fileName,"/minYDomain",&minYDomain);
+    }
+    if(dimension>2)  {
+      restoreIntMeta(fileName,"/nz",&nz);
+      restoreIntMeta(fileName,"/minZDomain",&minZDomain);
+    }
+    nxSub=nx/L;
+    subX=nxSub;
+    remainX=nx%L;
+    minX=maxX=0;
+    nySub=ny/M;
+    subY=nySub;
+    remainY=ny%M;
+    minY=maxY=0;
+    nzSub=nz/N;
+    subZ=nzSub;
+    remainZ=nz%N;
+    minZ=maxZ=0;
+
+
+    minX=maxX=0;
+    for(rankX=0; rankX<L; rankX++)
+    {
+      if(rankX<remainX)   tmpX=subX+1;
+      else                tmpX=subX;
+      minX=maxX;
+      maxX=minX+tmpX;
+
+      minZ=maxZ=minZDomain;
+      for(rankZ=0; rankZ<N; rankZ++)
+      {
+        if(rankZ<remainZ)   tmpZ=subZ+1;
+        else                tmpZ=subZ;
+        minZ=maxZ;
+        maxZ=minZ+tmpZ;
+
+        minY=maxY=minYDomain;
+        for(rankY=0; rankY<M; rankY++)
+        {
+          if(rankY<remainY)   tmpY=subY+1;
+          else                tmpY=subY;
+          minY=maxY;
+          maxY=minY+tmpY;
+
+          rank=rankY+rankZ*M+rankX*(M*N);
+          if(myrank==rank)
+          {
+             nxSub=tmpX;
+             nySub=tmpY;
+             nzSub=tmpZ;
+             minXSub=minX;
+             maxXSub=maxX;
+             minYSub=minY;
+             maxYSub=maxY;
+             minZSub=minZ;
+             maxZSub=maxZ;
+          }
+        }
+      }
+    }
+    istart=2;
+    iend=nxSub+2;
+    jstart=0;
+    jend=1;
+    kstart=0;
+    kend=1;
+    if(dimension>1)  {
+      jstart=2;
+      jend=nySub+2;
+    }
+    if(dimension>2)  {
+      kstart=2;
+      kend=nzSub+2;
+    }
+
+    rankX=myrank/(M*N);
+    rankZ=(myrank%(M*N))/M;
+    rankY=(myrank%(M*N))%M;
+
+    //setting resolution change
+    reNx=nx*resolX;
+    reNy=ny*resolY;
+    reNz=nz*resolZ;
+
+    reNxSub=nxSub*resolX;
+    reNySub=nySub*resolY;
+    reNzSub=nzSub*resolZ;
+    reIend=reNxSub+2;
+    reJend=reKend=1;
+    if(dimension>1)
+      reJend=reNySub+2;
+    if(dimension>2)
+      reKend=reNzSub+2;
+
+    calParameter(reNx+5,&saveIstart,&saveIend,&saveNxSub,rankX,&biasX,reIend,reNxSub,L);
+    saveJstart=saveKstart=0;
+    saveKend=saveKend=saveNySub=saveNzSub=1;
+    if(dimension>1)  
+      calParameter(reNy+5,&saveJstart,&saveJend,&saveNySub,rankY,&biasY,reJend,reNySub,M);
+    if(dimension>2)  
+      calParameter(reNz+5,&saveKstart,&saveKend,&saveNzSub,rankZ,&biasZ,reKend,reNzSub,N);
+     
+    //save outfile
+    sprintf(outFile,"dumpField%d.h5",step*resolX);
+    if(myrank==0)
+    {
+      file_id=H5Fcreate(outFile,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
+      H5Fclose(file_id);
+    }
+    else ;
+
+
+    switch (dimension)  {
+    case 2 :
+      fieldE=memoryAsign(nxSub+5,nySub+5,1);
+      fieldOld=memoryAsign(nxSub+5,nySub+5,1);
+      fieldNow=memoryAsign(nxSub+5,nySub+5,1);
+      fieldNext=memoryAsign(nxSub+5,nySub+5,1);
+
+      offset[0]=minXSub;
+      offset[1]=minYSub-minYDomain;
+      offset[2]=0;
+  
+//      offSet1[0]=(minXSub)*resolX+biasX;
+//      offSet1[1]=(minYSub-minYDomain)+biasY;
+//      offSet1[2]=0;
+      offSet[0]=(minXSub)*resolX+biasX;
+      offSet[1]=(minYSub-minYDomain)*resolY+biasY;
+      offSet[2]=0;
+
+      if(resolX>1 && resolY==1)
+      {
+        reField=memoryAsign(reNxSub+5,reNySub+5,1);
+        //save E field
+        restoreFieldComp(fieldE,fileName,"/Ex",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalX(fieldE,reField,2,iend,2,jend,0,1,resolX,rankX,0);
+        saveFieldComp(reField,outFile,"/Ex",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+
+        restoreFieldComp(fieldE,fileName,"/Ey",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalX(fieldE,reField,2,iend,2,jend,0,1,resolX,rankX,1);
+        saveFieldComp(reField,outFile,"/Ey",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldE,fileName,"/Ez",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalX(fieldE,reField,2,iend,2,jend,0,1,resolX,rankX,1);
+        saveFieldComp(reField,outFile,"/Ez",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        //save B field
+        sprintf(fileName,"dumpB%d.h5",step-2);
+        restoreFieldComp(fieldOld,fileName,"/Bx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/Bx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step);
+        restoreFieldComp(fieldNext,fileName,"/Bx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,2,jend,0,1,resolX,rankX,1);
+        saveFieldComp(reField,outFile,"/Bx",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpB%d.h5",step-2);
+        restoreFieldComp(fieldOld,fileName,"/By",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/By",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step);
+        restoreFieldComp(fieldNext,fileName,"/By",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,2,jend,0,1,resolX,rankX,0);
+        saveFieldComp(reField,outFile,"/By",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpB%d.h5",step-2);
+        restoreFieldComp(fieldOld,fileName,"/Bz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/Bz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step);
+        restoreFieldComp(fieldNext,fileName,"/Bz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,2,jend,0,1,resolX,rankX,0);
+        saveFieldComp(reField,outFile,"/Bz",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        //save J field
+        sprintf(fileName,"dumpJ%d.h5",step-2);
+        restoreFieldComp(fieldOld,fileName,"/Jx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/Jx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step);
+        restoreFieldComp(fieldNext,fileName,"/Jx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,2,jend,0,1,resolX,rankX,0);
+        saveFieldComp(reField,outFile,"/Jx",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpJ%d.h5",step-2);
+        restoreFieldComp(fieldOld,fileName,"/Jy",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/Jy",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step);
+        restoreFieldComp(fieldNext,fileName,"/Jy",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,2,jend,0,1,resolX,rankX,1);
+        saveFieldComp(reField,outFile,"/Jy",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpJ%d.h5",step-2);
+        restoreFieldComp(fieldOld,fileName,"/Jz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/Jz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step);
+        restoreFieldComp(fieldNext,fileName,"/Jz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,2,jend,0,1,resolX,rankX,1);
+        saveFieldComp(reField,outFile,"/Jz",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        deleteField(reField,reNxSub+5,reNySub+5,1);
+      }
+      else if(resolX==1 && resolY>1)
+      {
+        reField=memoryAsign(reNxSub+5,reNySub+5,1);
+        //save E field 
+        restoreFieldComp(fieldE,fileName,"/Ex",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldE,reField,2,iend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField,outFile,"/Ex",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldE,fileName,"/Ey",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldE,reField,2,iend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField,outFile,"/Ey",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldE,fileName,"/Ez",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldE,reField,2,iend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField,outFile,"/Ez",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        //save B field
+        sprintf(fileName,"dumpB%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/Bx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldNow,reField,2,iend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField,outFile,"/Bx",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldNow,fileName,"/By",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldNow,reField,2,iend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField,outFile,"/By",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldNow,fileName,"/Bz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldNow,reField,2,iend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField,outFile,"/Bz",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        //save J field
+        sprintf(fileName,"dumpJ%d.h5",step-1);
+        restoreFieldComp(fieldNow,fileName,"/Jx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldNow,reField,2,iend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField,outFile,"/Jx",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldNow,fileName,"/Jy",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldNow,reField,2,iend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField,outFile,"/Jy",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldNow,fileName,"/Jz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalY(fieldNow,reField,2,iend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField,outFile,"/Jz",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        deleteField(reField,reNxSub+5,reNySub+5,1);
+      }
+      else if(resolX>1 && resolY>1) //lala
+      {
+        //calculate for X direction
+        reField=memoryAsign(reNxSub+5,nySub+5,1);
+        reField1=memoryAsign(reNxSub+5,reNySub+5,1);
+
+        //save E field
+        sprintf(fileName,"dumpE%d.h5",step);
+        restoreFieldComp(fieldE,fileName,"/Ex",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalX(fieldE,reField,2,iend,0,jend+3,0,1,resolX,rankX,0);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField1,outFile,"/Ex",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldE,fileName,"/Ey",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalX(fieldE,reField,2,iend,0,jend+3,0,1,resolX,rankX,1);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField1,outFile,"/Ey",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        restoreFieldComp(fieldE,fileName,"/Ez",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        resolCalX(fieldE,reField,2,iend,0,jend+3,0,1,resolX,rankX,1);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField1,outFile,"/Ez",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        //save B field
+        sprintf(fileName,"dumpB%d.h5",step-1);
+        restoreFieldComp(fieldOld,fileName,"/Bx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step);
+        restoreFieldComp(fieldNow,fileName,"/Bx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step+1);
+        restoreFieldComp(fieldNext,fileName,"/Bx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,0,jend+3,0,1,resolX,rankX,1);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField1,outFile,"/Bx",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpB%d.h5",step-1);
+        restoreFieldComp(fieldOld,fileName,"/By",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step);
+        restoreFieldComp(fieldNow,fileName,"/By",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step+1);
+        restoreFieldComp(fieldNext,fileName,"/By",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,0,jend+3,0,1,resolX,rankX,0);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField1,outFile,"/By",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpB%d.h5",step-1);
+        restoreFieldComp(fieldOld,fileName,"/Bz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step);
+        restoreFieldComp(fieldNow,fileName,"/Bz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpB%d.h5",step+1);
+        restoreFieldComp(fieldNext,fileName,"/Bz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,0,jend+3,0,1,resolX,rankX,0);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField1,outFile,"/Bz",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        //save J field
+        sprintf(fileName,"dumpJ%d.h5",step-1);
+        restoreFieldComp(fieldOld,fileName,"/Jx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step);
+        restoreFieldComp(fieldNow,fileName,"/Jx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step+1);
+        restoreFieldComp(fieldNext,fileName,"/Jx",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,0,jend+3,0,1,resolX,rankX,0);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField1,outFile,"/Jx",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpJ%d.h5",step-1);
+        restoreFieldComp(fieldOld,fileName,"/Jy",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step);
+        restoreFieldComp(fieldNow,fileName,"/Jy",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step+1);
+        restoreFieldComp(fieldNext,fileName,"/Jy",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,0,jend+3,0,1,resolX,rankX,1);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,0);
+        saveFieldComp(reField1,outFile,"/Jy",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        sprintf(fileName,"dumpJ%d.h5",step-1);
+        restoreFieldComp(fieldOld,fileName,"/Jz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step);
+        restoreFieldComp(fieldNow,fileName,"/Jz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        sprintf(fileName,"dumpJ%d.h5",step+1);
+        restoreFieldComp(fieldNext,fileName,"/Jz",nx+5,ny+5,1,nxSub+5,nySub+5,nzSub,0,iend+3,0,jend+3,0,1,offset);
+        calBField(fieldOld,fieldNow,fieldNext,0,iend+3,0,jend+3,0,1,resolX);
+        resolCalX(fieldNow,reField,2,iend,0,jend+3,0,1,resolX,rankX,1);
+        resolCalY(reField,reField1,2,reIend,2,jend,0,1,resolY,rankY,1);
+        saveFieldComp(reField1,outFile,"/Jz",reNx+5,reNy+5,reNz,saveNxSub,saveNySub,saveNzSub,saveIstart,saveIend,saveJstart,saveJend,saveKstart,saveKend,offSet);
+        deleteField(reField,reNxSub+5,nySub+5,1);
+        deleteField(reField1,reNxSub+5,reNySub+5,1);
+      }
+
+
+      if(myrank==0)  {
+        tmpInt=minXDomain*resolX;
+        saveIntMeta(outFile,"/minXDomain",&tmpInt);
+        printf("%s is made.\n",outFile);
+      }  else	;
+
+      deleteField(fieldE,nxSub+5,nySub+5,1);
+      deleteField(fieldOld,nxSub+5,nySub+5,1);
+      deleteField(fieldNow,nxSub+5,nySub+5,1);
+      deleteField(fieldNext,nxSub+5,nySub+5,1);
+      break;
+    }
+   
+    
+    MPI_Finalize();
+
+    return 0;
+}
+
+void calBField(double ***fieldOld,double ***fieldNow,double ***fieldNext,int istart,int iend,int jstart,int jend,int kstart,int kend,int resolX)
+{
+  int i,j,k;
+  double y1,y2,y3,a,b,c,dx,x;
+
+  for(i=istart; i<iend; i++)
+    for(j=jstart; j<jend; j++)
+      for(k=kstart; k<kend; k++)
+      {
+        y1=fieldOld[i][j][k];
+        y2=fieldNow[i][j][k];
+        y3=fieldNext[i][j][k];
+        a=0.5*(y1+y3)-y2;
+        b=2.0*y2-1.5*y1-0.5*y3;
+        c=y1;
+        dx=1.0/((double)resolX);
+        x=0.5+dx*0.5; 
+        fieldNow[i][j][k]=(a*x*x+b*x+c);
+      }
+}
+
+void resolCalY(double ***field,double ***reField,int istart,int iend,int jstart,int jend,int kstart,int kend,int resolY,int rankY,int edge)
+{
+  int jj,i,j,k,n;
+  double y1,y2,y3,a,b,c,dy,y;
+
+  if(edge==1)
+  {
+    for(i=istart; i<iend; i++)
+      for(j=jstart; j<jend; j++)
+        for(k=kstart; k<kend; k++)
+        {
+          y1=field[i][j][k];
+          y2=field[i][j+1][k];
+          y3=field[i][j+2][k];
+          a=0.5*(y1+y3)-y2;
+          b=2.0*y2-1.5*y1-0.5*y3;
+          c=y1;
+          dy=1.0/((double)resolY);
+          jj=(j-jstart)*resolY+jstart;
+          for(n=0; n<resolY; n++)  {
+            y=dy*n;
+            reField[i][jj+n][k]=a*y*y+b*y+c;
+
+          }
+        }
+  }
+  else          //edge==0
+  {
+    for(i=istart; i<iend; i++)
+      for(j=jstart; j<jend; j++)
+        for(k=kstart; k<kend; k++)
+        {
+          y1=field[i][j-1][k];
+          y2=field[i][j][k];
+          y3=field[i][j+1][k];
+          a=0.5*(y1+y3)-y2;
+          b=2.0*y2-1.5*y1-0.5*y3;
+          c=y1;
+          dy=1.0/((double)resolY);
+          jj=(j-jstart)*resolY+jstart;
+          for(n=0; n<resolY; n++)     {
+            y=0.5+0.5*dy+dy*n;
+            reField[i][jj+n][k]=a*y*y+b*y+c;
+          }
+        }
+  }		//End of edge==0
+
+}
+
+
+void resolCalX(double ***field,double ***reField,int istart,int iend,int jstart,int jend,int kstart,int kend,int resolX,int rankX,int edge)
+{
+  int ii,i,j,k,n;
+  double y1,y2,y3,a,b,c,dx,x;
+
+  if(edge==1)
+  {
+    for(i=istart; i<iend; i++)
+      for(j=jstart; j<jend; j++)
+        for(k=kstart; k<kend; k++)
+        {
+          y1=field[i][j][k];
+          y2=field[i+1][j][k];
+          y3=field[i+2][j][k];
+          a=0.5*(y1+y3)-y2;
+          b=2.0*y2-1.5*y1-0.5*y3;
+          c=y1;
+          dx=1.0/((double)resolX);
+          ii=(i-istart)*resolX+istart;
+          for(n=0; n<resolX; n++)  {
+            x=dx*n;
+            reField[ii+n][j][k]=a*x*x+b*x+c;
+
+          }
+        }
+      if(rankX==0)
+      {
+        for(j=jstart; j<jend; j++)
+          for(k=kstart; k<kend; k++)
+          {
+            for(i=1; i<3; i++)   {
+              y1=field[istart-1][j][k];
+              y2=field[istart][j][k];
+              y3=field[istart+1][j][k];
+              a=0.5*(y1+y3)-y2;
+              b=2.0*y2-1.5*y1-0.5*y3;
+              c=y1;
+              dx=1.0/((double)resolX);
+              x=1.0-dx*i;
+              reField[istart-i][j][k]=a*x*x+b*x+c;
+            }
+          }
+      }  else   ;
+  }
+  else          //edge==0
+  {
+    for(i=istart; i<iend; i++)
+      for(j=jstart; j<jend; j++)
+        for(k=kstart; k<kend; k++)
+        {
+          y1=field[i-1][j][k];
+          y2=field[i][j][k];
+          y3=field[i+1][j][k];
+          a=0.5*(y1+y3)-y2;
+          b=2.0*y2-1.5*y1-0.5*y3;
+          c=y1;
+          dx=1.0/((double)resolX);
+          ii=(i-istart)*resolX+istart;
+          for(n=0; n<resolX; n++)     {
+            x=0.5+0.5*dx+dx*n;
+            reField[ii+n][j][k]=a*x*x+b*x+c;
+          }
+        }
+    if(rankX==0)
+    {
+      for(j=jstart; j<jend; j++)
+        for(k=kstart; k<kend; k++)
+        {
+          for(i=1; i<3; i++)
+          {
+            y1=field[istart-1][j][k];
+            y2=field[istart][j][k];
+            y3=field[istart+1][j][k];
+            a=0.5*(y1+y3)-y2;
+            b=2.0*y2-1.5*y1-0.5*y3;
+            c=y1;
+            dx=1.0/((double)resolX);
+            x=0.5+0.5*dx-dx*i;
+            reField[istart-i][j][k]=a*x*x+b*x+c;
+          }
+        }
+    }  else   ;
+  }		//End of edge==0
+
+}
+
+
+
+
+void saveFieldComp(double ***data,char *fileName,char *dataName,int nx,int ny,int nz,int nxSub,int nySub,int nzSub,int istart,int iend,int jstart,int jend,int kstart,int kend,int *offSet)
+{
+    int ii,i,j,k,start;
+    double *field;
+    FILE *out;
+    int myrank, nTasks;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+
+    hid_t file_id,dset_id,plist_id,tic_id;
+    herr_t status;
+    hid_t total_file_space,subfilespace,filespace,memspace,ticspace;
+    hsize_t dimsf[3],count[3],offset[3];
+
+    plist_id=H5Pcreate(H5P_FILE_ACCESS);
+    H5Pset_fapl_mpio(plist_id,MPI_COMM_WORLD,MPI_INFO_NULL);
+    file_id=H5Fopen(fileName,H5F_ACC_RDWR,plist_id);
+    H5Pclose(plist_id);
+
+    dimsf[0]=ny;
+    dimsf[1]=nx;
+    dimsf[2]=nz;
+    filespace=H5Screate_simple(3,dimsf,NULL);
+
+    count[0]=nySub;
+    count[1]=nxSub;
+    count[2]=nzSub;
+    offset[0]=offSet[1];
+    offset[1]=offSet[0];
+    offset[2]=offSet[2];
+    memspace=H5Screate_simple(3,count,NULL);
+
+    field = (double *)malloc(nxSub*nySub*nzSub*sizeof(double ));
+
+    dset_id=H5Dcreate2(file_id,dataName,H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+    subfilespace=H5Dget_space(dset_id);
+    H5Sselect_hyperslab(subfilespace,H5S_SELECT_SET,offset,NULL,count,NULL);
+    start=0;
+      for(j=jstart; j<jend; j++)
+        for(i=istart; i<iend; i++)
+        {
+          for(k=kstart; k<kend; k++)
+            field[start+k-kstart]=data[i][j][k];
+          start+=nzSub;
+        }
+
+    plist_id=H5Pcreate(H5P_DATASET_XFER);
+    H5Pset_dxpl_mpio(plist_id,H5FD_MPIO_COLLECTIVE);
+    status = H5Dwrite(dset_id, H5T_NATIVE_DOUBLE,memspace,subfilespace,plist_id,field);
+    H5Pclose(plist_id);
+    H5Sclose(subfilespace);
+    H5Dclose(dset_id);
+
+    H5Sclose(memspace);
+    H5Sclose(filespace);
+    H5Fclose(file_id);
+    free(field);
+}
+
+
+void restoreFieldComp(double ***data,char *fileName,char *dataName,int nx,int ny,int nz,int nxSub,int nySub,int nzSub,int istart,int iend,int jstart,int jend,int kstart,int kend,int *offSet)
+{
+  int i,j,k,start;
+  double *field;
+  char name[100];
+  int myrank, nTasks;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+  MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+
+  hid_t file_id,dset_id,plist_id;
+  herr_t status;
+  hid_t subfilespace,filespace,memspace;
+  hsize_t dimsf[3],count[3],offset[3];
+
+  plist_id=H5Pcreate(H5P_FILE_ACCESS);
+  H5Pset_fapl_mpio(plist_id,MPI_COMM_WORLD,MPI_INFO_NULL);
+  file_id=H5Fopen(fileName,H5F_ACC_RDWR,plist_id);
+  H5Pclose(plist_id);
+  dimsf[0]=ny;
+  dimsf[1]=nx;
+  dimsf[2]=nz;
+  filespace=H5Screate_simple(3,dimsf,NULL);
+
+  count[0]=nySub;
+  count[1]=nxSub;
+  count[2]=nzSub;
+  offset[0]=offSet[1];
+  offset[1]=offSet[0];
+  offset[2]=offSet[2];
+  memspace=H5Screate_simple(3,count,NULL);
+
+  field = (double *)malloc(nxSub*nySub*nzSub*sizeof(double ));
+
+  dset_id=H5Dopen2(file_id,dataName,H5P_DEFAULT);
+  subfilespace=H5Dget_space(dset_id);
+  H5Sselect_hyperslab(subfilespace,H5S_SELECT_SET,offset,NULL,count,NULL);
+  plist_id=H5Pcreate(H5P_DATASET_XFER);
+  H5Pset_dxpl_mpio(plist_id,H5FD_MPIO_COLLECTIVE);
+  status = H5Dread(dset_id, H5T_NATIVE_DOUBLE,memspace,subfilespace,plist_id,field);
+  start=0;
+  for(j=jstart; j<jend; j++)
+    for(i=istart; i<iend; i++)
+    {
+      for(k=kstart; k<kend; k++)
+        data[i][j][k]=field[start+k-kstart];
+      start+=nzSub;
+    }
+  H5Pclose(plist_id);
+  H5Sclose(subfilespace);
+  H5Dclose(dset_id);
+
+  H5Sclose(memspace);
+  H5Sclose(filespace);
+  H5Fclose(file_id);
+  free(field);
+}
+
+void saveIntMeta(char *fileName,char *dataName,int *data)
+{
+  hid_t file_id,dset_id,filespace;
+  hsize_t metaDim[1];
+  herr_t status;
+
+  metaDim[0]=1;
+
+  file_id=H5Fopen(fileName,H5F_ACC_RDWR,H5P_DEFAULT);
+  filespace=H5Screate_simple(1,metaDim,NULL);
+  dset_id=H5Dcreate2(file_id,dataName,H5T_NATIVE_INT,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+  status=H5Dwrite(dset_id,H5T_NATIVE_INT,H5S_ALL,H5S_ALL,H5P_DEFAULT,data);
+  H5Dclose(dset_id);
+  H5Sclose(filespace);
+  H5Fclose(file_id);
+}
+
+void restoreIntMeta(char *fileName,char *dataName,int *data)
+{
+  hid_t file_id,dset_id,filespace;
+  hsize_t metaDim[1];
+  herr_t status;
+
+  file_id=H5Fopen(fileName,H5F_ACC_RDWR,H5P_DEFAULT);
+  filespace=H5Screate_simple(1,metaDim,NULL);
+  dset_id=H5Dopen2(file_id,dataName,H5P_DEFAULT);
+  status=H5Dread(dset_id,H5T_NATIVE_INT,H5S_ALL,H5S_ALL,H5P_DEFAULT,data);
+  H5Dclose(dset_id);
+  H5Sclose(filespace);
+  H5Fclose(file_id);
+}
+
+double ***memoryAsign(int nx, int ny, int nz)
+{
+   int i,j,k;
+   double ***field;
+
+   field = (double ***)malloc((nx)*sizeof(double **));
+   for(i=0; i<nx; i++)
+   {
+     field[i] = (double **)malloc((ny)*sizeof(double *));
+     for(j=0; j<ny; j++)
+       field[i][j] = (double *)malloc((nz)*sizeof(double ));
+   }
+
+   for(i=0; i<nx; i++)
+     for(j=0; j<ny; j++)
+       for(k=0; k<nz; k++){
+         field[i][j][k]=0.0;
+       }
+
+   return field;
+}
+
+void deleteField(double ***field,int nx,int ny,int nz)
+{
+   int i,j,k;
+   for(i=0; i<nx; i++)
+   {
+     for(j=0; j<ny; j++)
+       free(field[i][j]);
+     free(field[i]);
+   }
+   free(field);
+}
+
+void calParameter(int nx,int *istart,int *iend,int *saveNxSub,int rankX,int *biasX,int reIend,int reNxSub,int L)
+{
+  if(L==1) {
+    *istart=0;
+    *iend=reIend+3;
+    *biasX=0;
+    *saveNxSub=nx;
+  } else  {
+    if(rankX==0)  {
+      *istart=0;
+      *iend=reIend;
+      *saveNxSub=reNxSub+2;
+      *biasX=0;
+    }  else if(rankX==L-1)  {
+      *istart=2;
+      *iend=reIend+3;
+      *saveNxSub=reNxSub+3;
+      *biasX=2;
+    } else  {
+      *istart=2;
+      *iend=reIend;
+      *saveNxSub=reNxSub;
+      *biasX=2;
+    }
+  }
+}
+
