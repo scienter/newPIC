@@ -43,6 +43,7 @@ void updateCurrent(Domain D)
   void MPI_TransferJ_Xminus();
   void MPI_TransferJ_Yplus();
   void MPI_TransferJ_Yminus();
+  void MPI_TransferF_Pukhov_Xminus();
 //  void MPI_TransferJ_Zplus();
 //  void MPI_TransferJ_Zminus();
   void removeBoostIon();
@@ -71,6 +72,7 @@ void updateCurrent(Domain D)
     if(D.L>1)  {
       MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
       MPI_TransferJ_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
+      MPI_TransferF_Pukhov_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
     }  else	;
     if(D.M>1)  {
       MPI_TransferJ_Yplus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);

@@ -158,6 +158,40 @@ void fieldSolve(Domain D,double t)
     printf("what fieldType? and what dimension?\n");
   }
 }
+/*
+void solveField1D_Split(Domain *D)
+{
+  int i,j,k,istart,iend,nxSub;
+  double dx,dt;
+  double nowPr,nowSr,prevPr,prevSr;
+  int nTasks,myrank;
+  MPI_Status status;
+  MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+  dx=D->dx;
+  dt=D->dt;
+  nxSub=D->nxSub;
+  istart=D->istart;
+  iend=D->iend;
+
+  j=k=0;
+  nowPr=D->Pr[istart-1][j][k];
+  nowSr=D->Sr[istart-1][j][k];
+  for(i=istart; i<iend; i++)
+  {
+    D->Ex[i][j][k]+=-2*pi*dt*D->Jx[i][j][k];
+    prevPr=nowPr;
+    nowPr=D->Pr[i][j][k];
+    D->Pr[i][j][k]=prevPr-pi*dt*D->Jy[i][j][k];
+    D->Pl[i-1][j][k]=D->Pl[i][j][k]-pi*dt*D->Jy[i][j][k];
+    prevSr=nowSr;
+    nowSr=D->Sr[i][j][k];
+    D->Sr[i][j][k]=prevSr-pi*dt*D->Jz[i][j][k];
+    D->Sl[i-1][j][k]=D->Sl[i][j][k]-pi*dt*D->Jz[i][j][k];
+  }  
+}
+*/
 
 void Bsolve2D_Pukhov(Domain *D)
 {
