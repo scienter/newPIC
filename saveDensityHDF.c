@@ -19,6 +19,8 @@ void solveDensity3D(Domain *D,int s,double coef);
 void saveCoordHDF(Domain *D,char *fileName);
 void density_xdmf(int dimension,char *fileName,int nx,int ny,int nz,int s);
 void setZero(double ***den,int nx, int ny, int nz);
+void deleteField(double ***field,int nx,int ny,int nz);
+
 
 
 void saveDenParticleHDF(Domain *D,int iteration)
