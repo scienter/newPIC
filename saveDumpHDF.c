@@ -21,8 +21,8 @@ void saveDump(Domain D,int iteration)
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
 
-  switch ((D.fieldType-1)*3+D.dimension)  {
-  case ((Pukhov-1)*3+2) :
+  switch (D.fieldType)  {
+  case (Pukhov) :
     if(D.saveDumpMode==HDF)  {
       saveDumpFieldHDF(&D,iteration);
       saveDumpParticleHDF(&D,iteration);
@@ -34,6 +34,157 @@ void saveDump(Domain D,int iteration)
     break;
   }
 
+}
+
+void saveDumpParticleHDF(Domain *D,int iteration)
+{
+    int i,j,k,s,istart,iend,jstart,jend,kstart,kend;
+    int cnt,totalCnt,index,start;
+    int minXSub,minYSub,minZSub,nxSub,nySub,nzSub;
+    char name[100],dataName[100];
+    double *data;
+    int *recv,*offSetRank;
+    Particle ***particle;
+    particle=D->particle;
+    ptclList *p;
+    LoadList *LL;
+
+    int myrank, nTasks;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+
+    hid_t file_id,group_id,plist_id,dset_id,attr_id,as_id;
+    hid_t filespace,memspace;
+    hsize_t dimsf[2],count[2],offset[2],block[2],stride[2],a_dims,metaDim[1];
+    herr_t ierr;
+
+    nxSub=D->nxSub;
+    nySub=D->nySub;
+    nzSub=D->nzSub;
+
+    istart=D->istart;
+    iend=D->iend;
+    jstart=D->jstart;
+    jend=D->jend;
+    kstart=D->kstart;
+    kend=D->kend;
+    minXSub=D->minXSub;
+    minYSub=D->minYSub;
+    minZSub=D->minZSub;
+
+    plist_id=H5Pcreate(H5P_FILE_ACCESS);
+    ierr=H5Pset_fapl_mpio(plist_id,MPI_COMM_WORLD,MPI_INFO_NULL);
+    //create file
+    sprintf(name,"dumpParticle%d.h5",iteration);
+    file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,plist_id);
+    ierr=H5Pclose(plist_id);
+
+    recv = (int *)malloc(nTasks*sizeof(int ));
+
+    for(s=0; s<D->nSpecies; s++)
+    {
+      cnt=0;
+      for(i=istart; i<iend; i++)
+        for(j=jstart; j<jend; j++)
+          for(k=kstart; k<kend; k++)          {
+            p=particle[i][j][k].head[s]->pt;
+            while(p)   {
+              cnt++;
+              p=p->next;
+            }
+          }
+      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Gather(&cnt,1,MPI_INT,recv,1,MPI_INT,0,MPI_COMM_WORLD);
+      MPI_Bcast(recv,nTasks,MPI_INT,0,MPI_COMM_WORLD);
+
+      start=0;
+      for(i=0; i<myrank; i++)        start+=recv[i];
+      totalCnt=0;
+      for(i=0; i<nTasks; i++)        totalCnt+=recv[i];
+
+      //file space
+      dimsf[0]=totalCnt;
+      dimsf[1]=9;
+      filespace=H5Screate_simple(2,dimsf,NULL);
+      sprintf(dataName,"%d",s);
+      dset_id=H5Dcreate2(file_id,dataName,H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+
+      if(totalCnt>0)
+      {
+        data = (double *)malloc(cnt*9*sizeof(double ));
+
+        index=0;
+        for(i=istart; i<iend; i++)
+          for(j=jstart; j<jend; j++)
+            for(k=kstart; k<kend; k++)  {
+              p=particle[i][j][k].head[s]->pt;
+              while(p)    {
+                data[index*9+0]=p->x+i-istart+minXSub;
+                data[index*9+1]=p->y+j-jstart+minYSub;
+                data[index*9+2]=p->z+k-kstart+minZSub;
+                data[index*9+3]=p->p1;
+                data[index*9+4]=p->p2;
+                data[index*9+5]=p->p3;
+                data[index*9+6]=p->index;
+                data[index*9+7]=p->core;
+                data[index*9+8]=p->weight;
+                index++;
+                p=p->next;
+              }
+            }
+
+        //memory space
+        dimsf[0]=cnt;
+        dimsf[1]=9;
+        memspace=H5Screate_simple(2,dimsf,NULL);
+
+        stride[0]=1;
+        stride[1]=1;
+        count[0]=1;
+        count[1]=1;
+
+        //hyperslab in file space
+        block[0]=cnt;
+        block[1]=9;
+        offset[0]=start;
+        offset[1]=0;
+        H5Sselect_hyperslab(filespace,H5S_SELECT_SET,offset,stride,count,block);
+
+        //hyperslab in memory space
+        offset[0]=0;
+        H5Sselect_hyperslab(memspace,H5S_SELECT_SET,offset,stride,count,block);
+      
+        plist_id=H5Pcreate(H5P_DATASET_XFER);
+        H5Pset_dxpl_mpio(plist_id,H5FD_MPIO_INDEPENDENT);
+        H5Dwrite(dset_id, H5T_NATIVE_DOUBLE,memspace,filespace,plist_id,data);
+        H5Pclose(plist_id);
+        H5Sclose(memspace);
+      
+        free(data);
+      }	else	; 	//End of totalCnt>0
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      //write meta
+      a_dims=1;
+      as_id=H5Screate_simple(1,&a_dims,NULL);
+      sprintf(dataName,"%dtotalCnt",s);
+//lala
+      attr_id=H5Acreate2(dset_id,dataName,H5T_NATIVE_INT,as_id,H5P_DEFAULT,H5P_DEFAULT);
+      H5Awrite(attr_id,H5T_NATIVE_INT,&totalCnt);
+      H5Aclose(attr_id);
+      H5Sclose(as_id);
+
+      H5Dclose(dset_id);
+
+      H5Sclose(filespace);
+    }	//End of nSpecies
+    free(recv);
+    H5Fclose(file_id);
+
+    sprintf(dataName,"nSpecies");
+    if(myrank==0)
+      saveIntMeta(name,dataName,&D->nSpecies,1);
+    else	;
 }
 
 void saveJDump(Domain D,int iteration)
@@ -384,153 +535,6 @@ void saveDumpParticleResolHDF(Domain *D,int iteration)
 
     free(recv);
     free(offSetRank);
-}
-
-void saveDumpParticleHDF(Domain *D,int iteration)
-{
-    int i,j,k,s,istart,iend,jstart,jend,kstart,kend;
-    int cnt,totalCnt,index,start;
-    int minXSub,minYSub,minZSub,nxSub,nySub,nzSub;
-    char name[100],name2[100],dataName[100];
-    double *data;
-    int *recv,*offSetRank;
-    Particle ***particle;
-    particle=D->particle;
-    ptclList *p;
-    LoadList *LL;
-
-    int myrank, nTasks;
-    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
-    MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
-
-    hid_t file_id,group_id,plist_id,dset_id,attr_id,as_id;
-    hid_t filespace,memspace;
-    hsize_t dimsf[2],count[2],offset[2],block[2],stride[2],a_dims;
-    herr_t ierr;
-
-    nxSub=D->nxSub;
-    nySub=D->nySub;
-    nzSub=D->nzSub;
-
-    istart=D->istart;
-    iend=D->iend;
-    jstart=D->jstart;
-    jend=D->jend;
-    kstart=D->kstart;
-    kend=D->kend;
-    minXSub=D->minXSub;
-    minYSub=D->minYSub;
-    minZSub=D->minZSub;
-
-    plist_id=H5Pcreate(H5P_FILE_ACCESS);
-    ierr=H5Pset_fapl_mpio(plist_id,MPI_COMM_WORLD,MPI_INFO_NULL);
-    //create file
-    sprintf(name,"dumpParticle%d.h5",iteration);
-    file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,plist_id);
-    ierr=H5Pclose(plist_id);
-
-    recv = (int *)malloc(nTasks*sizeof(int ));
-
-    for(s=0; s<D->nSpecies; s++)
-    {
-      cnt=0;
-      for(i=istart; i<iend; i++)
-        for(j=jstart; j<jend; j++)
-          for(k=kstart; k<kend; k++)          {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)   {
-              cnt++;
-              p=p->next;
-            }
-          }
-      MPI_Barrier(MPI_COMM_WORLD);
-      MPI_Gather(&cnt,1,MPI_INT,recv,1,MPI_INT,0,MPI_COMM_WORLD);
-      MPI_Bcast(recv,nTasks,MPI_INT,0,MPI_COMM_WORLD);
-
-      start=0;
-      for(i=0; i<myrank; i++)        start+=recv[i];
-      totalCnt=0;
-      for(i=0; i<nTasks; i++)        totalCnt+=recv[i];
-
-      //file space
-      dimsf[0]=totalCnt;
-      dimsf[1]=9;
-      filespace=H5Screate_simple(2,dimsf,NULL);
-      sprintf(dataName,"%d",s);
-      dset_id=H5Dcreate2(file_id,dataName,H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
-
-      if(totalCnt>0)
-      {
-        data = (double *)malloc(cnt*9*sizeof(double ));
-
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)
-            for(k=kstart; k<kend; k++)  {
-              p=particle[i][j][k].head[s]->pt;
-              while(p)    {
-                data[index*9+0]=p->x+i-istart+minXSub;
-                data[index*9+1]=p->y+j-jstart+minYSub;
-                data[index*9+2]=p->z+k-kstart+minZSub;
-                data[index*9+3]=p->p1;
-                data[index*9+4]=p->p2;
-                data[index*9+5]=p->p3;
-                data[index*9+6]=p->index;
-                data[index*9+7]=p->core;
-                data[index*9+8]=p->weight;
-                index++;
-                p=p->next;
-              }
-            }
-
-        //memory space
-        dimsf[0]=cnt;
-        dimsf[1]=9;
-        memspace=H5Screate_simple(2,dimsf,NULL);
-
-        stride[0]=1;
-        stride[1]=1;
-        count[0]=1;
-        count[1]=1;
-
-        //hyperslab in file space
-        block[0]=cnt;
-        block[1]=9;
-        offset[0]=start;
-        offset[1]=0;
-        H5Sselect_hyperslab(filespace,H5S_SELECT_SET,offset,stride,count,block);
-
-        //hyperslab in memory space
-        offset[0]=0;
-        H5Sselect_hyperslab(memspace,H5S_SELECT_SET,offset,stride,count,block);
-      
-        plist_id=H5Pcreate(H5P_DATASET_XFER);
-        H5Pset_dxpl_mpio(plist_id,H5FD_MPIO_INDEPENDENT);
-        H5Dwrite(dset_id, H5T_NATIVE_DOUBLE,memspace,filespace,plist_id,data);
-        H5Pclose(plist_id);
-        H5Sclose(memspace);
-      
-        free(data);
-      }	else	; 	//End of totalCnt>0
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      //write meta
-      a_dims=1;
-      as_id=H5Screate_simple(1,&a_dims,NULL);
-      sprintf(dataName,"%dtotalCnt",s);
-//lala
-      attr_id=H5Acreate2(dset_id,dataName,H5T_NATIVE_INT,as_id,H5P_DEFAULT,H5P_DEFAULT);
-      H5Awrite(attr_id,H5T_NATIVE_INT,&totalCnt);
-      H5Aclose(attr_id);
-      H5Sclose(as_id);
-
-      H5Dclose(dset_id);
-
-      H5Sclose(filespace);
-    }	//End of nSpecies
-    free(recv);
-
-    H5Fclose(file_id);
 }
 
 void saveEDumpHDF(Domain *D,int iteration)
