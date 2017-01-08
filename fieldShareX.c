@@ -53,9 +53,7 @@ void firstFieldShare(Domain D)
   }
 }
 
-void MPI_TransferF_Pukhov_Xminus(Domain *D
-         ,double ***f1,double ***f2,double ***f3
-         ,int ny,int nz,int share)
+void MPI_TransferF_Pukhov_Xminus(Domain *D,double ***f1,double ***f2,double ***f3,int ny,int nz,int share)
 {
     int i,j,k,numberData,start,end;
     int istart,iend,jstart,jend,kstart,kend;
@@ -78,7 +76,7 @@ void MPI_TransferF_Pukhov_Xminus(Domain *D
     //Transferring even ~ odd cores 
     start=0; 
     for(i=0; i<share; i++)
-      for(j=0; j<jend+3; j++)	
+      for(j=0; j<ny; j++)	
       {
         for(k=0; k<nz; k++)
           D->minusX[start+k]=f1[i+istart][j][k];
@@ -96,7 +94,7 @@ void MPI_TransferF_Pukhov_Xminus(Domain *D
       MPI_Recv(D->minusX,D->numMinusX, MPI_DOUBLE,D->nextXrank,D->nextXrank, MPI_COMM_WORLD,&status);  
       start=0; 
       for(i=0; i<share; i++)
-        for(j=0; j<jend+3; j++)	
+        for(j=0; j<ny; j++)	
         {
           for(k=0; k<nz; k++)
             f1[iend+i][j][k]=D->minusX[start+k];
@@ -116,7 +114,7 @@ void MPI_TransferF_Pukhov_Xminus(Domain *D
     //Transferring odd ~ even cores             
     start=0; 
     for(i=0; i<share; i++)
-      for(j=0; j<jend+3; j++)	
+      for(j=0; j<ny; j++)	
       {
         for(k=0; k<nz; k++)
           D->minusX[start+k]=f1[i+istart][j][k];
@@ -134,7 +132,7 @@ void MPI_TransferF_Pukhov_Xminus(Domain *D
       MPI_Recv(D->minusX,D->numMinusX, MPI_DOUBLE,D->nextXrank,D->nextXrank, MPI_COMM_WORLD,&status);  
       start=0; 
       for(i=0; i<share; i++)
-        for(j=0; j<jend+3; j++)	
+        for(j=0; j<ny; j++)	
         {
           for(k=0; k<nz; k++)
             f1[iend+i][j][k]=D->minusX[start+k];
@@ -154,9 +152,7 @@ void MPI_TransferF_Pukhov_Xminus(Domain *D
 }
 
 
-void MPI_TransferF_Pukhov_Xplus(Domain *D
-           ,double ***f1,double ***f2,double ***f3
-           ,int ny,int nz,int share)
+void MPI_TransferF_Pukhov_Xplus(Domain *D,double ***f1,double ***f2,double ***f3,int ny,int nz,int share)
 {
     int i,j,k,numberData,end,ibegin,ibottom;
     int istart,iend,jstart,jend,kstart,kend;
@@ -179,7 +175,7 @@ void MPI_TransferF_Pukhov_Xplus(Domain *D
     //Transferring even ~ odd cores 
     start=0; 
     for(i=1; i<share; i++)
-      for(j=0; j<jend+3; j++)	
+      for(j=0; j<ny; j++)	
       {
         for(k=0; k<nz; k++)
           D->plusX[start+k]=f1[iend-i][j][k];
@@ -197,7 +193,7 @@ void MPI_TransferF_Pukhov_Xplus(Domain *D
        MPI_Recv(D->plusX,D->numPlusX,MPI_DOUBLE,D->prevXrank,D->prevXrank, MPI_COMM_WORLD,&status);  
       start=0;
       for(i=1; i<share; i++)
-        for(j=0; j<jend+3; j++)	
+        for(j=0; j<ny; j++)	
         {
           for(k=0; k<nz; k++)
             f1[istart-i][j][k]=D->plusX[start+k];
@@ -217,7 +213,7 @@ void MPI_TransferF_Pukhov_Xplus(Domain *D
     //Transferring odd ~ even cores             
     start=0; 
     for(i=1; i<share; i++)
-      for(j=0; j<jend+3; j++)	
+      for(j=0; j<ny; j++)	
       {
         for(k=0; k<nz; k++)
           D->plusX[start+k]=f1[iend-i][j][k];
@@ -235,7 +231,7 @@ void MPI_TransferF_Pukhov_Xplus(Domain *D
       MPI_Recv(D->plusX,D->numPlusX,MPI_DOUBLE,D->prevXrank,D->prevXrank,MPI_COMM_WORLD,&status);  
       start=0;
       for(i=1; i<share; i++)
-        for(j=0; j<jend+3; j++)	
+        for(j=0; j<ny; j++)	
         {
           for(k=0; k<nz; k++)
             f1[istart-i][j][k]=D->plusX[start+k];

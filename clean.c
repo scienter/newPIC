@@ -28,7 +28,11 @@ void cleanMemory(Domain *D)
 
     //remove field share
     switch((D->fieldType-1)*3+D->dimension) {
-    case 1 :
+    case (Split-1)*3+1 :
+      free(D->plusX);
+      free(D->minusX);
+      free(D->XplusJ);
+      free(D->XminusJ);
       break;
     case (Pukhov-1)*3+2:
       free(D->plusX);
@@ -189,10 +193,8 @@ void cleanMemory(Domain *D)
       deleteField(D->Jy,nxSub,nySub,nzSub);
       deleteField(D->Jz,nxSub,nySub,nzSub);
     }
-/*
     else if(D->fieldType==Split)
     {
-
       deleteField(D->Ex,nxSub,nySub,nzSub);
       deleteField(D->Pr,nxSub,nySub,nzSub);
       deleteField(D->Pl,nxSub,nySub,nzSub);
@@ -211,9 +213,8 @@ void cleanMemory(Domain *D)
       deleteField(D->JxOld,nxSub,nySub,nzSub);
       deleteField(D->JyOld,nxSub,nySub,nzSub);
       deleteField(D->JzOld,nxSub,nySub,nzSub);
-
     }
-
+/*
     //remove track
     if(D->tracking==ON)
     {

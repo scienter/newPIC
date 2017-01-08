@@ -57,6 +57,11 @@ void updateCurrent(Domain D)
   switch((D.currentType-1)*3+D.dimension)  {
   case ((1-1)*3+1) :    
     updateCurrent1D_1st(&D,nSpecies);
+    if(D.L>1)  {
+      MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+      MPI_TransferJ_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+      MPI_TransferF_Pukhov_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+    }  else	;
     break;
   case ((1-1)*3+2) :    
 /*
@@ -149,7 +154,7 @@ void updateCurrent1D_1st(Domain *D,int nSpecies)
     int istart,iend;
     int nxSub;
     double inverDt,x1,x2,y1,y2,xr,yr,zr,z1,z2;
-    double Fx1,Fx2,Wx1,Wx2,dx,dt;
+    double Fx1,Fx2,Wx1,Wx2,dx,dt,weight;
     double wx,wy,vy,vz,gamma,xcc,xc;
     int intXc;
     
@@ -175,7 +180,7 @@ void updateCurrent1D_1st(Domain *D,int nSpecies)
     LL=D->loadList;
     while(LL->next)
     {
-       coeff[s]=LL->charge*LL->density/LL->criticalDensity/LL->numberInCell;
+       coeff[s]=LL->charge*LL->density/LL->criticalDensity;
        LL=LL->next;
        s++;
     }
@@ -204,6 +209,7 @@ void updateCurrent1D_1st(Domain *D,int nSpecies)
             while(p) 
             {
               gamma=sqrt(1.0+p->p1*p->p1+p->p2*p->p2+p->p3*p->p3);
+              weight=p->weight;
               x2=p->x+i;             
               x1=p->oldX;          
               i1=(int)x1;         
@@ -224,16 +230,16 @@ void updateCurrent1D_1st(Domain *D,int nSpecies)
               Wx1=0.5*(x1+xr)-i1;
               Wx2=0.5*(xr+x2)-i2;
    
-              D->Jx[i1][j][k]    +=Fx1*coeff[s];
+              D->Jx[i1][j][k]    +=Fx1*coeff[s]*weight;
  
-              D->Jx[i2][j][k]    +=Fx2*coeff[s];
+              D->Jx[i2][j][k]    +=Fx2*coeff[s]*weight;
 
               wx=1.0-xcc; 
-              D->Jy[intXc][j][k]    +=wx*vy*coeff[s];
-              D->Jz[intXc][j][k]    +=wx*vz*coeff[s];
+              D->Jy[intXc][j][k]    +=wx*vy*coeff[s]*weight;
+              D->Jz[intXc][j][k]    +=wx*vz*coeff[s]*weight;
               wx=xcc; 
-              D->Jy[intXc+1][j][k]+=wx*vy*coeff[s];
-              D->Jz[intXc+1][j][k]+=wx*vz*coeff[s];
+              D->Jy[intXc+1][j][k]+=wx*vy*coeff[s]*weight;
+              D->Jz[intXc+1][j][k]+=wx*vz*coeff[s]*weight;
 
               p=p->next;
             }    //End of while(p)
@@ -722,7 +728,7 @@ void updateCurrent2D_1st(Domain *D,int nSpecies)
     int nxSub,nySub,nzSub;
     double inverDt,x1,x2,y1,y2,xr,yr,zr,z1,z2;
     double Fx1,Fx2,Wx1,Wx2,Fy1,Fy2,Wy1,Wy2,Fz1,Fz2,Wz1,Wz2,dx,dy,dz,dt;
-    double wx,wy,vz,gamma,xcc,ycc,xc,yc;
+    double wx,wy,vz,gamma,xcc,ycc,xc,yc,weight;
     int intXc,intYc;
     
     ptclList *p;
@@ -756,7 +762,7 @@ void updateCurrent2D_1st(Domain *D,int nSpecies)
     LL=D->loadList;
     while(LL->next)
     {
-       coeff[s]=LL->charge*LL->density/LL->criticalDensity/LL->numberInCell;
+       coeff[s]=LL->charge*LL->density/LL->criticalDensity;
        LL=LL->next;
        s++;
     }
@@ -786,6 +792,7 @@ void updateCurrent2D_1st(Domain *D,int nSpecies)
             while(p) 
             {
               gamma=sqrt(1.0+p->p1*p->p1+p->p2*p->p2+p->p3*p->p3);
+              weight=p->weight;
               x2=p->x+i;       y2=p->y+j;      
               x1=p->oldX;      y1=p->oldY;     
               i1=(int)x1;      j1=(int)y1;     
@@ -813,24 +820,24 @@ void updateCurrent2D_1st(Domain *D,int nSpecies)
               Wy1=0.5*(y1+yr)-j1;
               Wy2=0.5*(yr+y2)-j2;
    
-              D->Jx[i1][j1][k]    +=Fx1*(1-Wy1)*coeff[s];
-              D->Jx[i1][j1+1][k]  +=Fx1*    Wy1*coeff[s];
-              D->Jy[i1][j1][k]    +=Fy1*(1-Wx1)*coeff[s];
-              D->Jy[i1+1][j1][k]  +=Fy1*    Wx1*coeff[s];
+              D->Jx[i1][j1][k]    +=Fx1*(1-Wy1)*coeff[s]*weight;
+              D->Jx[i1][j1+1][k]  +=Fx1*    Wy1*coeff[s]*weight;
+              D->Jy[i1][j1][k]    +=Fy1*(1-Wx1)*coeff[s]*weight;
+              D->Jy[i1+1][j1][k]  +=Fy1*    Wx1*coeff[s]*weight;
  
-              D->Jx[i2][j2][k]    +=Fx2*(1-Wy2)*coeff[s];
-              D->Jx[i2][j2+1][k]  +=Fx2*    Wy2*coeff[s];
-              D->Jy[i2][j2][k]    +=Fy2*(1-Wx2)*coeff[s];
-              D->Jy[i2+1][j2][k]  +=Fy2*    Wx2*coeff[s];
+              D->Jx[i2][j2][k]    +=Fx2*(1-Wy2)*coeff[s]*weight;
+              D->Jx[i2][j2+1][k]  +=Fx2*    Wy2*coeff[s]*weight;
+              D->Jy[i2][j2][k]    +=Fy2*(1-Wx2)*coeff[s]*weight;
+              D->Jy[i2+1][j2][k]  +=Fy2*    Wx2*coeff[s]*weight;
 
               wx=1.0-xcc;   wy=1.0-ycc;
-              D->Jz[intXc][intYc][k]    +=wx*wy*vz*coeff[s];
+              D->Jz[intXc][intYc][k]    +=wx*wy*vz*coeff[s]*weight;
               wx=xcc;   wy=ycc;
-              D->Jz[intXc+1][intYc+1][k]+=wx*wy*vz*coeff[s];
+              D->Jz[intXc+1][intYc+1][k]+=wx*wy*vz*coeff[s]*weight;
               wx=1.0-xcc;   wy=ycc;
-              D->Jz[intXc][intYc+1][k]  +=wx*wy*vz*coeff[s];
+              D->Jz[intXc][intYc+1][k]  +=wx*wy*vz*coeff[s]*weight;
               wx=xcc;   wy=1.0-ycc;
-              D->Jz[intXc+1][intYc][k]  +=wx*wy*vz*coeff[s];
+              D->Jz[intXc+1][intYc][k]  +=wx*wy*vz*coeff[s]*weight;
 
               p=p->next;
             }    //End of while(p)

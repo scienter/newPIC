@@ -81,7 +81,11 @@ void boundary(Domain *D,External *Ext)
      {
        if(myrank==rank)
        {
-         if(D->dimension==2)
+         if(D->dimension==1)
+         {
+           printf("rank=%d, minXSub=%d,maxSub=%d\n",myrank,D->minXSub,D->maxXSub);
+         }
+         else if(D->dimension==2)
          {
            printf("rank=%d, minXSub=%d,maxSub=%d,minYSub=%d,maxYSub=%d\n",myrank,D->minXSub,D->maxXSub,D->minYSub,D->maxYSub);
          }
@@ -148,10 +152,15 @@ void boundary(Domain *D,External *Ext)
 
     //Share Field
     switch((D->fieldType-1)*3+D->dimension) {
-    case 1 :
+    case (Split-1)*3+1 :
+      //first 3 is 3 field variables, 2nd 1 is y, 3rd 1 is z, 4rd 2 or 3 is layer.
+      D->numPlusX=3*nySub2D*1*2;
+      D->plusX = (double *)malloc(D->numPlusX*sizeof(double ));
+      D->numMinusX=3*nySub2D*1*3;
+      D->minusX = (double *)malloc(D->numMinusX*sizeof(double ));
       break;
     case (Pukhov-1)*3+2:
-      //first 4 is 4 field variables, 2nd 1 is k, 3rd 2 or 3 is layer.
+      //first 3 is 3 field variables, 2nd 1 is k, 3rd 2 or 3 is layer.
       D->numPlusX=3*nySub2D*1*2;
       D->plusX = (double *)malloc(D->numPlusX*sizeof(double ));
       D->numMinusX=3*nySub2D*1*3;
@@ -227,6 +236,10 @@ void boundary(Domain *D,External *Ext)
     // current J trasffering boundary
     switch(D->dimension)  {
     case 1 :
+      D->numPlusXJ=3*nySub2D*1*3;
+      D->XplusJ = (double *)malloc(D->numPlusXJ*sizeof(double ));
+      D->numMinusXJ=3*nySub2D*1*2;
+      D->XminusJ = (double *)malloc(D->numMinusXJ*sizeof(double ));
       break;
     case 2 :
       D->numPlusXJ=3*nySub2D*1*3;
@@ -259,29 +272,29 @@ void boundary(Domain *D,External *Ext)
 
      switch(D->fieldType)  {
      case Split :
-//       D->Ex=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->Bx=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->Pr=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->Pl=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->Sr=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->Sl=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->ExC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->BxC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->PrC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->PlC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->SrC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->SlC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->Jx=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
-//       D->Jy=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
-//       D->Jz=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
-//       D->JxOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
-//       D->JyOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
-//       D->JzOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
+       D->Ex=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->Bx=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->Pr=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->Pl=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->Sr=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->Sl=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->ExC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->BxC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->PrC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->PlC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->SrC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->SlC=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+       D->Jx=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
+       D->Jy=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
+       D->Jz=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
+       D->JxOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
+       D->JyOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
+       D->JzOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
 //       D->JxBoost=memoryAsign(nxSub1D,nySub2D,nzSub3D);
 //       D->JyBoost=memoryAsign(nxSub1D,nySub2D,nzSub3D);
 //       D->JzBoost=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-;
        break;
+
      case Yee :
        D->Ex=memoryAsign(nxSub1D,nySub2D,nzSub3D);
        D->Ey=memoryAsign(nxSub1D,nySub2D,nzSub3D);
@@ -340,15 +353,14 @@ void boundary(Domain *D,External *Ext)
      if(D->dimension==1)
      {
        j=k=0;
-       for(i=0; i<D->iend+1; i++)	//i starts at 0 because of boost frame
-         {
-           D->particle[i][j][k].head = (ptclHead **)malloc(D->nSpecies*sizeof(ptclHead *));
-           for(s=0; s<D->nSpecies; s++)
-           {
-             D->particle[i][j][k].head[s] = (ptclHead *)malloc(sizeof(ptclHead));
-             D->particle[i][j][k].head[s]->pt = NULL;
-           }
+       //i starts at 0 because of boost frame
+       for(i=0; i<D->iend+1; i++)     {
+         D->particle[i][j][k].head = (ptclHead **)malloc(D->nSpecies*sizeof(ptclHead *));
+         for(s=0; s<D->nSpecies; s++)      {
+           D->particle[i][j][k].head[s] = (ptclHead *)malloc(sizeof(ptclHead));
+           D->particle[i][j][k].head[s]->pt = NULL;
          }
+       }
      }
      else if(D->dimension==2)
      {

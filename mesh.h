@@ -67,6 +67,7 @@ typedef struct _Domain
    int minXDomain,minYDomain,minZDomain;
    int numberInCell;
    int moving;         //Moving domain option. 1:on
+   int shiftDuration;
 
    double lambda;
    double omega;
@@ -119,6 +120,18 @@ typedef struct _Domain
    double ***Jx;    
    double ***Jy;    
    double ***Jz;    
+
+   //split mode
+   double ***Pr;    
+   double ***Pl;    
+   double ***Sr;    
+   double ***Sl;
+   double ***ExC;
+   double ***BxC;      
+   double ***PrC;    
+   double ***PlC;    
+   double ***SrC;    
+   double ***SlC;    
    double ***JxOld;    
    double ***JyOld;    
    double ***JzOld;    

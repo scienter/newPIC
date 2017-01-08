@@ -733,21 +733,22 @@ void saveField(Domain *D,int iteration)
     factor=D->gamma*(1+D->beta);
 
     switch((D->fieldType-1)*3+D->dimension) {
+
     case (Split-1)*3+1:
       j=k=0;
-      for(i=istart; i<iend; i++)
-      {
-          x=(i-2+D->minXSub)*D->dx*D->lambda;
-//          Ex=D->Ex[i][j][k];    
-//          Ey=D->Pr[i][j][k]+D->Pl[i][j][k];
-//          Ez=D->Sr[i][j][k]+D->Sl[i][j][k];
-//          Bx=0.0;    
-//          By=D->Sl[i][j][k]-D->Sr[i][j][k];
-//          Bz=D->Pr[i][j][k]-D->Pl[i][j][k];
-//          fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Ey,Ez,Bx,By,Bz);
+      for(i=istart; i<iend; i++)      {
+        x=(i-2+D->minXSub)*D->dx*D->lambda;
+        Ex=D->Ex[i][j][k];    
+        Ey=D->Pr[i][j][k]+D->Pl[i][j][k];
+        Ez=D->Sr[i][j][k]+D->Sl[i][j][k];
+        Bx=0.0;    
+        By=D->Sl[i][j][k]-D->Sr[i][j][k];
+        Bz=D->Pr[i][j][k]-D->Pl[i][j][k];
+        fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Ey,Ez,Bx,By,Bz);
       }
       fclose(out);
       break;
+
     case (Split-1)*3+2:
       k=0;
       for(i=istart; i<iend; i++)
@@ -926,7 +927,7 @@ void saveParticle(Domain *D,int iteration)
 {
   int i,j,k,istart,iend,jstart,jend,kstart,kend,s,core,index;
   char name[100];
-  double x,y,z,p1,p2,p3,gamma,mc;
+  double x,y,z,p1,p2,p3,gamma,mc,weight;
   double Pr,Pl,E1,Sr,Sl,B1;
   double minPx[D->nSpecies];
   Particle ***particle;
@@ -953,8 +954,8 @@ void saveParticle(Domain *D,int iteration)
     s++;
   }
 
-  switch (D->dimension)
-  {
+  switch (D->dimension)  {
+  //1D
   case 1:
     for(s=0; s<D->nSpecies; s++)
     {
@@ -971,13 +972,17 @@ void saveParticle(Domain *D,int iteration)
             p2=p->p2;    
             p3=p->p3;
             index=p->index;
-            fprintf(out,"%g %g %g %g %d\n",x,p1,p2,p3,index);               
+            core=p->core;
+            weight=p->weight;
+            fprintf(out,"%g %g %g %g %d %d %g\n",x,p1,p2,p3,index,core,weight);               
 //              fprintf(out,"%g %g %g %g %g\n",x,y,p->E1,p->E2,p->E3);               
             p=p->next;
           }	//End of while(p)
         }
     }				//End of for(s)
     break;
+
+  //2D
   case 2:
     for(s=0; s<D->nSpecies; s++)
     {

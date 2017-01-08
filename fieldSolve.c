@@ -5,7 +5,7 @@
 #include "constants.h"
 
 void absorb2D_UD(Domain *D,double *upr,double *btr,double *upd,double *btd,double y,double upL,double bottomL,double LdU,double LdB,double rr,double rd);
-
+void solve1D_Split(Domain *D);
 
 void fieldSolve(Domain D,double t)
 {
@@ -28,8 +28,24 @@ void fieldSolve(Domain D,double t)
   switch((D.fieldType-1)*3+D.dimension) {
   //1D field
   case (Split-1)*3+1:
-//    solveField1D_DSX(D);
+    //load laser
+    if(D.boostOn==OFF)    {
+      L=D.laserList;
+      while(L->next)  {
+        loadLaser(&D,L,t); 
+//         if(L->direction==1)     loadLaser2D(&D,L,t); 
+//         else if(L->direction==-1)     loadLaserOpp2D(&D,L,t); 
+        L=L->next;
+      }
+    }
+
+    solve1D_Split(&D);
+    if(D.L>1) {
+      MPI_TransferF_Pukhov_Xplus(&D,D.Ex,D.Pr,D.Sr,1,1,3);
+      MPI_TransferF_Pukhov_Xminus(&D,D.Bx,D.Pl,D.Sl,1,1,3);
+    }
     break;
+
   //split 2D
   case (Split-1)*3+2:
 //    if(D->boostIon==OFF && D->boostOn==ON)
@@ -47,7 +63,6 @@ void fieldSolve(Domain D,double t)
 //        absorb2D(D,UP);
 //      else	;
 //    }
-;
     break;
 
   //3D
@@ -80,8 +95,7 @@ void fieldSolve(Domain D,double t)
 //      else	;
 //    }
 //    else	;
-    MPI_Barrier(MPI_COMM_WORLD);
-
+//    MPI_Barrier(MPI_COMM_WORLD);
     break;
 
   //Yee 2D
@@ -96,17 +110,16 @@ void fieldSolve(Domain D,double t)
       MPI_TransferF_Pukhov_Yplus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
     } else	;
 
-       //load laser
-       if(D.boostOn==OFF)
-       {
-         L=D.laserList;
-         while(L->next)  {
-           loadLaser(&D,L,t); 
-//         if(L->direction==1)     loadLaser2D(&D,L,t); 
+    //load laser
+    if(D.boostOn==OFF)   {
+      L=D.laserList;
+      while(L->next)  {
+        loadLaser(&D,L,t); 
+//        if(L->direction==1)     loadLaser2D(&D,L,t); 
 //         else if(L->direction==-1)     loadLaserOpp2D(&D,L,t); 
-           L=L->next;
-         }
-       }
+        L=L->next;
+      }
+    }
 
     Bsolve2D_Yee(&D);
     if(D.L>1)  {
@@ -117,8 +130,8 @@ void fieldSolve(Domain D,double t)
       MPI_TransferF_Pukhov_Yminus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
       MPI_TransferF_Pukhov_Yplus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
     } else	;
-
     break;
+
   //Pukhov 2D
   case (Pukhov-1)*3+2:
     Esolve2D_Pukhov(&D);
@@ -131,18 +144,16 @@ void fieldSolve(Domain D,double t)
       MPI_TransferF_Pukhov_Yplus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
     } else	;
 
-       //load laser
-       if(D.boostOn==OFF)
-       {
-         L=D.laserList;
-         while(L->next)  {
-           loadLaser(&D,L,t); 
+    //load laser
+    if(D.boostOn==OFF)       {
+      L=D.laserList;
+      while(L->next)  {
+        loadLaser(&D,L,t); 
 //         if(L->direction==1)     loadLaser2D(&D,L,t); 
 //         else if(L->direction==-1)     loadLaserOpp2D(&D,L,t); 
-           L=L->next;
-         }
-       }
-
+        L=L->next;
+      }
+    }  else ;
 
     Bsolve2D_Pukhov(&D);
     if(D.L>1)  {
@@ -154,26 +165,21 @@ void fieldSolve(Domain D,double t)
       MPI_TransferF_Pukhov_Yplus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
     } else	;
     break;
+
   default:
     printf("what fieldType? and what dimension?\n");
   }
 }
-/*
-void solveField1D_Split(Domain *D)
+
+void solve1D_Split(Domain *D)
 {
   int i,j,k,istart,iend,nxSub;
   double dx,dt;
   double nowPr,nowSr,prevPr,prevSr;
-  int nTasks,myrank;
-  MPI_Status status;
-  MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
-  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-  dx=D->dx;
-  dt=D->dt;
+  dx=D->dx;          dt=D->dt;
+  istart=D->istart;  iend=D->iend;
   nxSub=D->nxSub;
-  istart=D->istart;
-  iend=D->iend;
 
   j=k=0;
   nowPr=D->Pr[istart-1][j][k];
@@ -184,14 +190,15 @@ void solveField1D_Split(Domain *D)
     prevPr=nowPr;
     nowPr=D->Pr[i][j][k];
     D->Pr[i][j][k]=prevPr-pi*dt*D->Jy[i][j][k];
-    D->Pl[i-1][j][k]=D->Pl[i][j][k]-pi*dt*D->Jy[i][j][k];
+    D->Pl[i][j][k]=D->Pl[i+1][j][k]-pi*dt*D->Jy[i+1][j][k];
+
     prevSr=nowSr;
     nowSr=D->Sr[i][j][k];
     D->Sr[i][j][k]=prevSr-pi*dt*D->Jz[i][j][k];
-    D->Sl[i-1][j][k]=D->Sl[i][j][k]-pi*dt*D->Jz[i][j][k];
+    D->Sl[i][j][k]=D->Sl[i+1][j][k]-pi*dt*D->Jz[i+1][j][k];
   }  
 }
-*/
+
 
 void Bsolve2D_Pukhov(Domain *D)
 {

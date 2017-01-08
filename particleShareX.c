@@ -13,8 +13,18 @@ void particleShareX(Domain D)
   particle=D.particle; 
 
   switch(D.dimension)  {
+  //1D
   case 1 :
+    istart=D.istart;
+    iend=D.iend;
+    jstart=0;
+    jend=1;
+    kstart=0;
+    kend=1;
+    MPI_TransferP_Xplus(&D,istart,iend,jstart,jend,kstart,kend);
+    MPI_TransferP_Xminus(&D,istart,iend,jstart,jend,kstart,kend);
     break;
+  //2D
   case 2 :
     istart=D.istart;
     iend=D.iend;

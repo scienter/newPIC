@@ -10,6 +10,7 @@
 double maxwellianVelocity(double temperature);
 double randomValue(double beta);
 void loadPlasma_crystal(Domain *D,LoadList *LL,int s);
+void random1D_sobol(double *x,gsl_qrng *q);
 void random2D_sobol(double *x,double *y,gsl_qrng *q);
 void random3D_sobol(double *x,double *y,double *z);
 
@@ -52,27 +53,112 @@ double applyFunctionYZ(int mode,double centerY,double y,double centerZ,double z,
 
 void loadPlasma(Domain *D,LoadList *LL,int s,int iteration)
 {
+  void loadPolygonPlasma1D();
   void loadPolygonPlasma2D();
 //  void loadPolygonPlasma3D();
   void loadChannelPlasma();
 //  void loadPlasma_crystal(Domain *D,LoadList *LL,int s);
 
 
-  switch((LL->type-1)*3+D->dimension)
-  {
-  case 1:
+  switch((LL->type-1)*3+D->dimension)  {
+  //1D
+  case ((Polygon-1)*3+1):
+    loadPolygonPlasma1D(D,LL,s,iteration); 
 //    loadPlasma_crystal(D,LL,s);
     break;
+
+  //2D
   case ((Polygon-1)*3+2):
     loadPolygonPlasma2D(D,LL,s,iteration); 
     break;
 //  case ((Polygon-1)*3+3):
 //    loadPolygonPlasma3D(D,LL,s,iteration); 
     break;
+
   default:
     ;
   }
 }
+
+void loadPolygonPlasma1D(Domain *D,LoadList *LL,int s,int iteration)
+{
+   int i,j,k,istart,iend,intNum,cnt,l,t,modeX;
+   double posX,v1,v2,v3,centerX,tmp,weight;
+   double ne,randTest,positionX,gaussCoefX,polyCoefX;
+   int myrank;
+   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+   Particle ***particle;
+   particle=D->particle;
+
+   ptclList *New,*p;   
+
+   istart=D->istart;
+   iend=D->iend;
+   centerX=LL->centerX;
+   gaussCoefX=LL->gaussCoefX;
+   polyCoefX=LL->polyCoefX;
+   modeX=LL->modeX;
+   weight=1.0/LL->numberInCell;
+
+   srand(myrank-1);
+
+   //position define      
+   j=k=0;
+   for(i=istart; i<iend; i++)
+     {
+       gsl_qrng *q = gsl_qrng_alloc (gsl_qrng_sobol,1);
+       for(l=0; l<LL->xnodes-1; l++)
+         {
+           posX=(double)(i+D->minXSub-istart);
+           if(posX>=LL->xpoint[l] && posX<LL->xpoint[l+1])
+           {
+             ne=((LL->xn[l+1]-LL->xn[l])/(LL->xpoint[l+1]-LL->xpoint[l])*(posX-LL->xpoint[l])+LL->xn[l]);
+             tmp=applyFunctionX(modeX,centerX,posX,gaussCoefX,polyCoefX);
+             ne*=tmp;
+             ne*=LL->numberInCell;
+             intNum=(int)ne;
+             randTest=ne-intNum;
+             if(randTest>randomValue(1.0)) intNum=intNum+1; else;
+
+             cnt=0;
+             while(cnt<intNum)
+             {      
+//               positionX=randomValue(1.0);
+               random1D_sobol(&positionX,q);
+               New = (ptclList *)malloc(sizeof(ptclList)); 
+               New->next = particle[i][j][k].head[s]->pt;
+               particle[i][j][k].head[s]->pt = New;
+ 
+               New->x = positionX;
+               New->oldX=i+positionX;
+               New->y = 0.0;
+               New->oldY=j+0.0;
+               New->z = 0.0;
+               New->oldZ=k+0.0;
+
+               New->E1=New->E2=New->E3=0.0;
+               New->B1=New->B2=New->B3=0.0;
+               v1=maxwellianVelocity(LL->temperature)/velocityC;
+               v2=maxwellianVelocity(LL->temperature)/velocityC;
+               v3=maxwellianVelocity(LL->temperature)/velocityC;
+               New->p1=v1;
+               New->p2=v2;
+               New->p3=v3;
+               New->weight=weight;
+               LL->index+=1;
+               New->index=LL->index;            
+               New->core=myrank;            
+
+               cnt++; 
+             }		//end of while(cnt)
+
+           } else;	
+         } 		//end of for(lnodes)  
+
+       gsl_qrng_free(q);
+     }			//End of for(i,j)         
+}
+
 
 void loadPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
 {
@@ -331,6 +417,14 @@ double randomValue(double beta)
    r = ((double)intRand)/randRange+(1.0-beta);
 
    return r;
+}
+
+void random1D_sobol(double *x,gsl_qrng *q)
+{
+   double v[1];
+
+   gsl_qrng_get(q,v);
+   *x=v[0];
 }
 
 void random2D_sobol(double *x,double *y,gsl_qrng *q)

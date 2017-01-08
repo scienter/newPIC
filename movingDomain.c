@@ -8,8 +8,8 @@ void movingDomain(Domain *D,int iteration)
   void movingDomain2D_Pukhov();
 
   switch((D->fieldType-1)*3+D->dimension)  {
-  case ((Pukhov-1)*3+1) :
-//    movingDomain1D_DSX(D);
+  case ((Split-1)*3+1) :
+//    movingDomain1D_Split(D);
     break;
   case ((Yee-1)*3+2) :
     movingDomain2D_Pukhov(D,iteration);
@@ -28,7 +28,7 @@ void movingDomain(Domain *D,int iteration)
   }
 }
 /*
-void movingDomain1D_DSX(Domain *D)
+void movingDomain1D_Split(Domain *D)
 {
     int i,j,k,istart,iend,s;
     double x;
@@ -94,7 +94,8 @@ void movingDomain1D_DSX(Domain *D)
     D->minXSub+=1;
     D->maxXSub+=1;
 }
-*/  
+*/
+  
 void movingDomain2D_Pukhov(Domain *D)
 {
     int i,j,k,s,istart,iend,jstart,jend,kstart,kend,shiftDuration;

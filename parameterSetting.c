@@ -356,7 +356,15 @@ void parameterSetting(Domain *D,External *Ext, char *input)
    D->nz=1;
    tmpDouble=D->dx/(D->gamma*(1+D->beta));
    D->dy=D->dz=1.0;
-   D->dt=D->dx*D->dtRatio;
+   if(D->fieldType==Split) {
+     D->dt=D->dx; 
+     D->dtRatio=1.0;
+     D->shiftDuration=1;
+   } else {
+     D->dt=D->dx*D->dtRatio;
+     D->shiftDuration=(int)(1.0/(1.0-D->dtRatio));
+   }
+
    if(D->dimension>1)
    {
      D->dy=D->dx*dyoverdx;
@@ -412,14 +420,13 @@ void parameterSetting(Domain *D,External *Ext, char *input)
    if(myrank==0)
    {
      printf("dx=%g,dt=%g\n",D->dx,D->dt);
-     if(D->dimension==2)
-     {
+     if(D->dimension==1)     {
+       printf("gamma=%g, dx=%g, dt=%g, divisionLambda=%g\n",D->gamma,D->dx,D->dt,D->divisionLambda);
+     } else if(D->dimension==2)     {
        printf("gamma=%g, dx=%g, dy=%g, dt=%g, divisionLambda=%g\n",D->gamma,D->dx,D->dy,D->dt,D->divisionLambda);
-     }
-     else if(D->dimension==3)
-     {
+     } else if(D->dimension==3)     {
        printf("gamma=%g, dx=%g, dy=%g, dz=%g, dt=%g, divisionLambda=%g\n",D->gamma,D->dx,D->dy,D->dz,D->dt,D->divisionLambda);
-     }
+     } else ;
    }
    else ;
    MPI_Barrier(MPI_COMM_WORLD);

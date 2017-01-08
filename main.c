@@ -8,7 +8,7 @@
 int main(int argc, char *argv[])
 {
     int i,j,k,n,s,iteration=0,filter,boost,filterStep,labSaveStep;
-    int rnk,suddenDump=OFF,shiftDuration;
+    int rnk,suddenDump=OFF;
     double factor,time_spent;
     clock_t begin,end;
     double t;
@@ -36,11 +36,9 @@ int main(int argc, char *argv[])
       exit(0); 
     }
 
+    //parameter setting
     parameterSetting(&D,&Ext,argv[1]);
-
-    if(argc >= 3)
-      D.dumpStep = atoi(argv[2]);
-    else	;
+    if(argc >= 3)      D.dumpStep = atoi(argv[2]); else;
 
     //create mesh
     boundary(&D,&Ext);
@@ -65,9 +63,7 @@ int main(int argc, char *argv[])
       t=0;
     }
     MPI_Barrier(MPI_COMM_WORLD);
-
-    shiftDuration=(int)(1.0/(1.0-D.dtRatio));
-
+    
     //rooping time 
     while(iteration<=D.maxStep+D.resolX)
     {
@@ -161,7 +157,7 @@ int main(int argc, char *argv[])
        updateCurrent(D);
 
        if(iteration>=D.nx && D.moving==ON && D.boostOn==OFF 
-          && (iteration-D.nx)%shiftDuration!=0 )
+          && (iteration-D.nx)%D.shiftDuration!=0 )
        {
          movingDomain(&D,iteration);
          LL=D.loadList;

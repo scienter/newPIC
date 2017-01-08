@@ -7,7 +7,7 @@ double calBi2D(double ***field,int i,int j,double x,double y);
 
 void interpolation(Domain *D,External *Ext)
 {
-//  void interpolation1D_DSX_1st();
+  void interpolation1D_Split_1st();
   void interpolation2D_Pukhov_1st();
   void interpolation2D_Pukhov_2nd();
 //  void interpolation2D_DSX_2nd();
@@ -30,15 +30,25 @@ void MPI_TransferF_Pukhov_Yplus(Domain *D
 
 
   switch((D->interpolationType-1)*3+D->dimension)  {
+  //1D 1st
+  case ((1-1)*3+1) :
+    if(D->L>1)  {
+      MPI_TransferF_Pukhov_Xminus(D,D->Ex,D->Pr,D->Pl,1,1,3);
+      MPI_TransferF_Pukhov_Xplus(D,D->Ex,D->Pr,D->Pl,1,1,3);
+      MPI_TransferF_Pukhov_Xminus(D,D->Bx,D->Sr,D->Sl,1,1,3);
+      MPI_TransferF_Pukhov_Xplus(D,D->Bx,D->Sr,D->Sl,1,1,3);
+    }  else	;
+    interpolation1D_Split_1st(D,Ext);
+    break;
   case ((1-1)*3+2) :
     if(D->L>1)  {
       MPI_TransferF_Pukhov_Xminus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
       MPI_TransferF_Pukhov_Xplus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
-    }
+    } else	;
     if(D->M>1)  {
       MPI_TransferF_Pukhov_Yminus(D,D->BxNow,D->ByNow,D->BzNow,D->nxSub+5,1,3);
       MPI_TransferF_Pukhov_Yplus(D,D->BxNow,D->ByNow,D->BzNow,D->nxSub+5,1,3);
-    }
+    } else	;
 
     interpolation2D_Pukhov_1st(D,Ext);
     break;
@@ -236,8 +246,7 @@ double calBi2D(double ***field,int i,int j,double x,double y)
   return result;
 }
 
-/*
-void interpolation1D_DSX_1st(Domain *D,External *Ext)
+void interpolation1D_Split_1st(Domain *D,External *Ext)
 {
    int i,j,k,i1,istart,iend,s,cnt;
    double E1,Pr,Pl,B1,Sr,Sl,extE1,extE2,extE3,extB1,extB2,extB3,x,x1;
@@ -293,7 +302,7 @@ void interpolation1D_DSX_1st(Domain *D,External *Ext)
        }		//for(s)        
      }		   //for(i,j)
 }
-*/
+
 /*
 void interpolation2D_DSX_2nd(Domain *D,External *Ext)  //bicubic
 {
