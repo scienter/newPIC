@@ -35,7 +35,7 @@ void saveDump(Domain D,int iteration)
 void saveDumpParticleHDF(Domain *D,int iteration)
 {
     int i,j,k,s,istart,iend,jstart,jend,kstart,kend;
-    int cnt,totalCnt,index,start;
+    int cnt,totalCnt,index,start,cntList[D->nSpecies];
     int minXSub,minYSub,minZSub,nxSub,nySub,nzSub;
     char name[100],dataName[100];
     double *data;
@@ -97,6 +97,7 @@ void saveDumpParticleHDF(Domain *D,int iteration)
       for(i=0; i<myrank; i++)        start+=recv[i];
       totalCnt=0;
       for(i=0; i<nTasks; i++)        totalCnt+=recv[i];
+      cntList[s]=totalCnt;
 
       //file space
       dimsf[0]=totalCnt;
@@ -159,7 +160,7 @@ void saveDumpParticleHDF(Domain *D,int iteration)
         free(data);
       }	else	; 	//End of totalCnt>0
       MPI_Barrier(MPI_COMM_WORLD);
-
+/*
       //write meta
       a_dims=1;
       as_id=H5Screate_simple(1,&a_dims,NULL);
@@ -169,7 +170,7 @@ void saveDumpParticleHDF(Domain *D,int iteration)
       H5Awrite(attr_id,H5T_NATIVE_INT,&totalCnt);
       H5Aclose(attr_id);
       H5Sclose(as_id);
-
+*/
       H5Dclose(dset_id);
 
       H5Sclose(filespace);
@@ -177,10 +178,14 @@ void saveDumpParticleHDF(Domain *D,int iteration)
     free(recv);
     H5Fclose(file_id);
 
-    sprintf(dataName,"nSpecies");
-    if(myrank==0)
+    if(myrank==0)  {
+      sprintf(dataName,"nSpecies");
       saveIntMeta(name,dataName,&D->nSpecies,1);
-    else	;
+      for(s=0; s<D->nSpecies; s++)  {
+        sprintf(dataName,"%dtotalCnt",s);
+        saveIntMeta(name,dataName,&cntList[s],1);
+      }
+    }  else	;
 }
 
 void saveJDump(Domain D,int iteration)

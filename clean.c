@@ -29,14 +29,10 @@ void cleanMemory(Domain *D)
     //remove field share
     switch((D->fieldType-1)*3+D->dimension) {
     case (Split-1)*3+1 :
-      free(D->plusX);
-      free(D->minusX);
       free(D->XplusJ);
       free(D->XminusJ);
       break;
     case (Pukhov-1)*3+2:
-      free(D->plusX);
-      free(D->minusX);
       free(D->plusY);
       free(D->minusY);
       free(D->XplusJ);

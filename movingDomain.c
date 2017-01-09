@@ -7,29 +7,33 @@ void movingDomain(Domain *D,int iteration)
   int shiftDuration;
   void movingDomain1D_Split();
   void movingDomain2D_Pukhov();
+  void MPI_Transfer3F_Xminus();
+  void MPI_Transfer3F_Xplus();
+  void MPI_Transfer6F_Xminus();
+  void MPI_Transfer6F_Xplus();
 
   switch((D->fieldType-1)*3+D->dimension)  {
   case ((Split-1)*3+1) :
     movingDomain1D_Split(D);
     if(D->L>1)  {
-      MPI_Transfer3F_Xminus(D,D->Jx,D->Jy,D->Jz,1,1,3);
-      MPI_Transfer3F_Xplus(D,D->Jx,D->Jy,D->Jz,1,1,3);
+      MPI_Transfer6F_Xminus(D,D->Bx,D->Pl,D->Sl,D->Jx,D->Jy,D->Jz,1,1,3);
+      MPI_Transfer3F_Xplus(D,D->Ex,D->Pr,D->Sr,1,1,3);
     } else      ;
 
     break;
   case ((Yee-1)*3+2) :
     movingDomain2D_Pukhov(D,iteration);
     if(D->L>1)  {
-      MPI_Transfer3F_Xminus(D,D->Jx,D->Jy,D->Jz,D->nySub+5,1,3);
-      MPI_Transfer3F_Xplus(D,D->Jx,D->Jy,D->Jz,D->nySub+5,1,3);
+      MPI_Transfer6F_Xminus(D,D->Ex,D->Ey,D->Ez,D->Bx,D->By,D->Bz,D->nySub+5,1,3);
+      MPI_Transfer6F_Xplus(D,D->Ex,D->Ey,D->Ez,D->Bx,D->By,D->Bz,D->nySub+5,1,3);
     } else      ;
     break;
 
   case ((Pukhov-1)*3+2) :
     movingDomain2D_Pukhov(D);
     if(D->L>1)  {
-      MPI_Transfer3F_Xminus(D,D->Jx,D->Jy,D->Jz,D->nySub+5,1,3);
-      MPI_Transfer3F_Xplus(D,D->Jx,D->Jy,D->Jz,D->nySub+5,1,3);
+      MPI_Transfer6F_Xminus(D,D->Ex,D->Ey,D->Ez,D->Bx,D->By,D->Bz,D->nySub+5,1,3);
+      MPI_Transfer6F_Xplus(D,D->Ex,D->Ey,D->Ez,D->Bx,D->By,D->Bz,D->nySub+5,1,3);
     } else      ;
     break;
 

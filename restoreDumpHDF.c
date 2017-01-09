@@ -155,52 +155,64 @@ void restoreDumpHDF(Domain *D,int iteration)
     }    else	;
     MPI_Bcast(&nSpecies,1,MPI_INT,0,MPI_COMM_WORLD);
 
+    int cntList[nSpecies];
+
+    for(s=0; s<nSpecies; s++)  {
+      sprintf(dataName,"%dtotalCnt",s);
+      if(myrank==0)  
+        restoreIntMeta(name,dataName,&cntList[s],1);
+      else	;
+      MPI_Bcast(&cntList[s],1,MPI_INT,0,MPI_COMM_WORLD);
+    }
+
     //set HDF5 parameter
     hid_t file_id,dset_id,plist_id,attr_id;
     hid_t filespace,memspace;
     hsize_t dimsf[2],count[2],offSet[2],block[2],stride[2];
     herr_t ierr;
 
-    //open file
-    plist_id=H5Pcreate(H5P_FILE_ACCESS);
-    H5Pset_fapl_mpio(plist_id,MPI_COMM_WORLD,MPI_INFO_NULL);
-    file_id=H5Fopen(name,H5F_ACC_RDWR,plist_id);
-    H5Pclose(plist_id);
-
     for(s=0; s<nSpecies; s++)
     {
-      //set dataset
-      sprintf(dataName,"%d",s);
-      dset_id=H5Dopen2(file_id,dataName,H5P_DEFAULT);
+      totalCnt=cntList[s];
+      if(totalCnt>0)
+      {
+        //open file
+        plist_id=H5Pcreate(H5P_FILE_ACCESS);
+        H5Pset_fapl_mpio(plist_id,MPI_COMM_WORLD,MPI_INFO_NULL);
+        file_id=H5Fopen(name,H5F_ACC_RDWR,plist_id);
+        H5Pclose(plist_id);
 
+        //set dataset
+        sprintf(dataName,"%d",s);
+        dset_id=H5Dopen2(file_id,dataName,H5P_DEFAULT);
+/*
       //attribute
       sprintf(dataName,"%dtotalCnt",s);
       attr_id=H5Aopen(dset_id,dataName,H5P_DEFAULT);
       H5Aread(attr_id,H5T_NATIVE_INT,&totalCnt);
       H5Aclose(attr_id);
       MPI_Barrier(MPI_COMM_WORLD);
+*/
+        sub=totalCnt/nTasks;
+        remain=totalCnt%nTasks;
+        for(rank=0; rank<nTasks; rank++) {
+          if(rank<remain)  tmp=sub+1;
+          else	         tmp=sub;
+          if(myrank==rank)
+            cntSub=tmp;
+        }
+        MPI_Gather(&cntSub,1,MPI_INT,recv,1,MPI_INT,0,MPI_COMM_WORLD);
+        MPI_Bcast(recv,nTasks,MPI_INT,0,MPI_COMM_WORLD);
+        start=0;
+        for(i=0; i<myrank; i++)
+          start+=recv[i];
 
-      sub=totalCnt/nTasks;
-      remain=totalCnt%nTasks;
-      for(rank=0; rank<nTasks; rank++) {
-        if(rank<remain)  tmp=sub+1;
-        else	         tmp=sub;
-        if(myrank==rank)
-          cntSub=tmp;
-      }
-      MPI_Gather(&cntSub,1,MPI_INT,recv,1,MPI_INT,0,MPI_COMM_WORLD);
-      MPI_Bcast(recv,nTasks,MPI_INT,0,MPI_COMM_WORLD);
-      start=0;
-      for(i=0; i<myrank; i++)
-        start+=recv[i];
+        for(i=0; i<nTasks; i++)  {
+          sharePNum[i]=0;
+          recvData[i]=0;
+          coreCnt[i]=0;
+        }
 
-      for(i=0; i<nTasks; i++)  {
-        sharePNum[i]=0;
-        recvData[i]=0;
-        coreCnt[i]=0;
-      }
-      if(totalCnt>0)
-      {
         data = (double *)malloc(cntSub*9*sizeof(double ));
 
         //file space
@@ -234,9 +246,11 @@ void restoreDumpHDF(Domain *D,int iteration)
         H5Pset_dxpl_mpio(plist_id,H5FD_MPIO_INDEPENDENT);
         ierr=H5Dread(dset_id,H5T_NATIVE_DOUBLE,memspace,filespace,plist_id,data);
 
+        H5Dclose(dset_id);
         H5Pclose(plist_id);
         H5Sclose(memspace);
         H5Sclose(filespace);
+        H5Fclose(file_id);
 
         //for testing the core of each particle
         dataCore = (int *)malloc(cntSub*sizeof(int ));       
@@ -352,7 +366,7 @@ void restoreDumpHDF(Domain *D,int iteration)
               p->p3=recvData[i][j*dataCnt+5];
               p->index=recvData[i][j*dataCnt+6];
               p->core=recvData[i][j*dataCnt+7];
-              p->index=recvData[i][j*dataCnt+8];
+              p->weight=recvData[i][j*dataCnt+8];
             }
           } 
           MPI_Barrier(MPI_COMM_WORLD);
@@ -366,13 +380,8 @@ void restoreDumpHDF(Domain *D,int iteration)
           free(sendData[i]);
         }        
 
-      }		//End of totalCnt>0
-      MPI_Barrier(MPI_COMM_WORLD);
-
-
-      H5Dclose(dset_id);
-    } 	//End of nSpecies 
-    H5Fclose(file_id);
+      }	else ;	//End of totalCnt>0
+    } 		//End of nSpecies 
 
     free(recv);
     free(minXSub);

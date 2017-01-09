@@ -13,21 +13,10 @@ void interpolation(Domain *D,External *Ext)
 //  void interpolation2D_DSX_2nd();
 //  void interpolation3D_DSX_1st();
 //  void interpolation3D_DSX_2nd();
-void MPI_TransferF_Pukhov_Xminus(Domain *D
-         ,double ***f1,double ***f2,double ***f3
-         ,int ny,int nz,int share);
-void MPI_TransferF_Pukhov_Xplus(Domain *D
-           ,double ***f1,double ***f2,double ***f3
-           ,int ny,int nz,int share);
-void MPI_TransferF_Pukhov_Yminus(Domain *D
-         ,double ***f1,double ***f2,double ***f3
-         ,int nx,int nz,int share);
-void MPI_TransferF_Pukhov_Yplus(Domain *D
-           ,double ***f1,double ***f2,double ***f3
-           ,int nx,int nz,int share);
-
-
-
+  void MPI_Transfer3F_Xminus();
+  void MPI_Transfer3F_Xplus();
+  void MPI_TransferF_Pukhov_Yminus();
+  void MPI_TransferF_Pukhov_Yplus();
 
   switch((D->interpolationType-1)*3+D->dimension)  {
   //1D 1st

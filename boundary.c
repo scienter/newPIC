@@ -152,19 +152,8 @@ void boundary(Domain *D,External *Ext)
 
     //Share Field
     switch((D->fieldType-1)*3+D->dimension) {
-    case (Split-1)*3+1 :
-      //first 3 is 3 field variables, 2nd 1 is y, 3rd 1 is z, 4rd 2 or 3 is layer.
-      D->numPlusX=3*nySub2D*1*2;
-      D->plusX = (double *)malloc(D->numPlusX*sizeof(double ));
-      D->numMinusX=3*nySub2D*1*3;
-      D->minusX = (double *)malloc(D->numMinusX*sizeof(double ));
-      break;
     case (Pukhov-1)*3+2:
       //first 3 is 3 field variables, 2nd 1 is k, 3rd 2 or 3 is layer.
-      D->numPlusX=3*nySub2D*1*2;
-      D->plusX = (double *)malloc(D->numPlusX*sizeof(double ));
-      D->numMinusX=3*nySub2D*1*3;
-      D->minusX = (double *)malloc(D->numMinusX*sizeof(double ));
       D->numPlusY=3*nxSub1D*1*2;
       D->plusY = (double *)malloc(D->numPlusY*sizeof(double ));
       D->numMinusY=3*nxSub1D*1*3;
@@ -172,10 +161,6 @@ void boundary(Domain *D,External *Ext)
       break;
     case (Yee-1)*3+2:
       //first 4 is 4 field variables, 2nd 1 is k, 3rd 2 or 3 is layer.
-      D->numPlusX=3*nySub2D*1*2;
-      D->plusX = (double *)malloc(D->numPlusX*sizeof(double ));
-      D->numMinusX=3*nySub2D*1*3;
-      D->minusX = (double *)malloc(D->numMinusX*sizeof(double ));
       D->numPlusY=3*nxSub1D*1*2;
       D->plusY = (double *)malloc(D->numPlusY*sizeof(double ));
       D->numMinusY=3*nxSub1D*1*3;
