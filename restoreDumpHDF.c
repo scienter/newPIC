@@ -16,13 +16,8 @@ void restoreDump(Domain D,int iteration)
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
 
-  switch ((D.fieldType-1)*3+D.dimension)  {
-  case ((Pukhov-1)*3+2) :
-    if(D.saveDumpMode==HDF)  {
-      restoreDumpHDF(&D,iteration);
-    }
-    break;
-  }
+  if(D.saveDumpMode==HDF)
+    restoreDumpHDF(&D,iteration);
 
 }
 

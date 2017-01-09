@@ -4,15 +4,15 @@
 #include "constants.h"
 #include <math.h>
 #include <mpi.h>
-//#include <gsl/gsl_qrng.h>
+#include <gsl/gsl_qrng.h>
 
 
 double maxwellianVelocity(double temperature);
 double randomValue(double beta);
 void loadPlasma_crystal(Domain *D,LoadList *LL,int s);
-//void random1D_sobol(double *x,gsl_qrng *q);
-//void random2D_sobol(double *x,double *y,gsl_qrng *q);
-//void random3D_sobol(double *x,double *y,double *z);
+void random1D_sobol(double *x,gsl_qrng *q);
+void random2D_sobol(double *x,double *y,gsl_qrng *q);
+void random3D_sobol(double *x,double *y,double *z);
 
 
 double applyFunctionX(int mode,double centerX,double x,double gaussCoefX,double polyCoefX)
@@ -106,7 +106,7 @@ void loadPolygonPlasma1D(Domain *D,LoadList *LL,int s,int iteration)
    j=k=0;
    for(i=istart; i<iend; i++)
      {
-//       gsl_qrng *q = gsl_qrng_alloc (gsl_qrng_sobol,1);
+       gsl_qrng *q = gsl_qrng_alloc (gsl_qrng_sobol,1);
        for(l=0; l<LL->xnodes-1; l++)
          {
            posX=(double)(i+D->minXSub-istart);
@@ -123,8 +123,8 @@ void loadPolygonPlasma1D(Domain *D,LoadList *LL,int s,int iteration)
              cnt=0;
              while(cnt<intNum)
              {      
-               positionX=randomValue(1.0);
-//               random1D_sobol(&positionX,q);
+//               positionX=randomValue(1.0);
+               random1D_sobol(&positionX,q);
                New = (ptclList *)malloc(sizeof(ptclList)); 
                New->next = particle[i][j][k].head[s]->pt;
                particle[i][j][k].head[s]->pt = New;
@@ -155,7 +155,7 @@ void loadPolygonPlasma1D(Domain *D,LoadList *LL,int s,int iteration)
            } else;	
          } 		//end of for(lnodes)  
 
-//       gsl_qrng_free(q);
+       gsl_qrng_free(q);
      }			//End of for(i,j)         
 }
 
@@ -197,7 +197,7 @@ void loadPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
    for(i=istart; i<iend; i++)
      for(j=jstart; j<jend; j++)
      {
-//       gsl_qrng *q = gsl_qrng_alloc (gsl_qrng_sobol,2);
+       gsl_qrng *q = gsl_qrng_alloc (gsl_qrng_sobol,2);
 
        for(l=0; l<LL->xnodes-1; l++)
          for(t=0; t<LL->ynodes-1; t++)
@@ -222,9 +222,9 @@ void loadPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
              cnt=0;
              while(cnt<intNum)
              {      
-               positionX=randomValue(1.0);
-               positionY=randomValue(1.0);
-//               random2D_sobol(&positionX,&positionY,q);
+//               positionX=randomValue(1.0);
+//               positionY=randomValue(1.0);
+               random2D_sobol(&positionX,&positionY,q);
 
                New = (ptclList *)malloc(sizeof(ptclList)); 
                New->next = particle[i][j][k].head[s]->pt;
@@ -255,7 +255,7 @@ void loadPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
 
            }	
          } 		//end of for(lnodes)  
-//       gsl_qrng_free(q);
+       gsl_qrng_free(q);
 
      }			//End of for(i,j)
          
@@ -418,7 +418,7 @@ double randomValue(double beta)
 
    return r;
 }
-/*
+
 void random1D_sobol(double *x,gsl_qrng *q)
 {
    double v[1];
@@ -448,4 +448,4 @@ void random3D_sobol(double *x,double *y,double *z)
 
    gsl_qrng_free(q);
 }
-*/
+
