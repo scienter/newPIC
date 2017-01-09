@@ -4,12 +4,17 @@
 #include "constants.h"
 #include <math.h>
 #include <mpi.h>
+#include <gsl/gsl_qrng.h>
 
 double randomValue(double beta);
 double maxwellianVelocity(double temperature);
 void loadMovingPlasma_crystal(Domain *D,LoadList *LL,int s);
 double applyFunctionX(int mode,double centerX,double x,double gaussCoefX,double polyCoefX);
 double applyFunctionYZ(int mode,double centerY,double y,double centerZ,double z,double gaussCoefYZ,double polyCoefYZ);
+void random1D_sobol(double *x,gsl_qrng *q);
+void random2D_sobol(double *x,double *y,gsl_qrng *q);
+void random3D_sobol(double *x,double *y,double *z);
+
 
 void loadMovingPlasma(Domain *D,LoadList *LL,int s,int iteration)
 {
@@ -19,30 +24,34 @@ void loadMovingPlasma(Domain *D,LoadList *LL,int s,int iteration)
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
+  void loadMovingPolygonPlasma1D();
   void loadMovingPolygonPlasma2D();
   void loadDefinedPlasma2D();
   void loadMovingPolygonPlasma3D();
   void loadDefinedPlasma3D();
-  void loadBoostPlasma2D();
 
-  switch((LL->type-1)*3+D->dimension)
-  {
+  rankX=myrank/(D->M*D->N);
+  switch((LL->type-1)*3+D->dimension)  {
+  //1D
   case 1:
-//    loadMovingPlasma_crystal(D,LL,s);
+    if(rankX==D->L-1)
+      loadMovingPolygonPlasma1D(D,LL,s,iteration); 
+    else	;
+    MPI_Barrier(MPI_COMM_WORLD);
     break;
+
+  //2D
   case (Polygon-1)*3+2:
-    rankX=myrank/(D->M*D->N);
     if(rankX==D->L-1)
       loadMovingPolygonPlasma2D(D,LL,s,iteration); 
     else	;
+    MPI_Barrier(MPI_COMM_WORLD);
     break;
   case (Defined-1)*3+2:
     if(LL->minLoadTime<=iteration && iteration<=LL->maxLoadTime)
       loadDefinedPlasma2D(D,LL,s); 
     break;
-  case (BoostFrame-1)*3+2:
-    loadBoostPlasma2D(D,LL,s,iteration); 
-    break;
+    MPI_Barrier(MPI_COMM_WORLD);
 
   //3D
   case (Polygon-1)*3+3:
@@ -56,128 +65,6 @@ void loadMovingPlasma(Domain *D,LoadList *LL,int s,int iteration)
   default:
     ;
   }
-}
-
-
-void loadBoostPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
-{
-   int i,j,k,istart,iend,jstart,jend,l,intNum,cnt;
-   int posX,posY,iter,t;
-   double tmp,dx,dy;
-   double wp,pDt,v1,v2,v3,gamma,beta[2];
-
-   double ne,randTest=0,positionX,positionY;
-
-
-   ptclList *New,*p;   
-   Particle ***particle;
-   particle=D->particle;
-
-   dx=D->dx;
-   dy=D->dy;
-
-   beta[0]=D->beta;
-   beta[1]=1.0;
-
-   istart=D->istart;
-   iend=D->iend;
-   jstart=D->jstart;
-   jend=D->jend;
-
-   srand(iteration);
-
-   //position define      
-   iter=0;
-   k=0;
-   for(i=iend-1; i<=iend; i++)
-   {
-     for(j=jstart; j<jend; j++)
-     {
-       for(l=0; l<LL->xnodes-1; l++)
-         for(t=0; t<LL->ynodes-1; t++)
-         {           
-           posX=i+D->minXSub-istart;
-           posY=j+D->minYSub-jstart;
-           if((posX>=LL->xpoint[l] && posX<LL->xpoint[l+1]) && 
-              (posY>=LL->ypoint[t] && posY<LL->ypoint[t+1]))
-           {
-             ne=((LL->xn[l+1]-LL->xn[l])/(LL->xpoint[l+1]-LL->xpoint[l])
-                *(posX-LL->xpoint[l])+LL->xn[l]);
-             ne*=((LL->yn[t+1]-LL->yn[t])/(LL->ypoint[t+1]-LL->ypoint[t])
-                *(posY-LL->ypoint[t])+LL->yn[t]);
-             ne*=LL->numberInCell*beta[iter];	//it is the double number of superparticles.
-             intNum=(int)ne;
-             randTest=ne-intNum;
-             cnt=0;
-
-             while(cnt<intNum)
-             {               
-               positionX=randomValue(beta[iter]);
-               positionY=randomValue(1.0);
-  
-               New = (ptclList *)malloc(sizeof(ptclList)); 
-               New->next = particle[i][j][k].head[s]->pt;
-               particle[i][j][k].head[s]->pt = New;
-
-               New->x = positionX;
-               New->oldX=i+positionX;
-               New->y = positionY;
-               New->oldY=j+positionY;
-               New->z = 0;
-               New->oldZ=k+0;
-
-               New->E1=New->E2=New->E3=0.0;
-               New->B1=New->B2=New->B3=0.0;
-               v1=maxwellianVelocity(LL->temperature)/velocityC;
-               v2=maxwellianVelocity(LL->temperature)/velocityC;
-               v3=maxwellianVelocity(LL->temperature)/velocityC;
-
-               New->p1=-D->gamma*D->beta+v1;
-               New->p2=v2;
-               New->p3=v3;
-               New->weight=1.0/LL->numberInCell;
-  
-
-               LL->index+=1;
-               New->index=LL->index;            
-
-               cnt++;
-             }		//end of while(cnt)
-
-             if(randTest>randomValue(1.0))
-             {
-               positionX=randomValue(beta[iter]);
-               positionY=randomValue(1.0);
-
-               New = (ptclList *)malloc(sizeof(ptclList)); 
-               New->next = particle[i][j][k].head[s]->pt;
-               particle[i][j][k].head[s]->pt = New;
- 
-               New->x = positionX;
-               New->oldX=i+positionX;
-               New->y = positionY;
-               New->oldY=j+positionY;
-               New->z = 0;
-               New->oldZ=k+0;
-
-               New->E1=New->E2=New->E3=0.0;
-               New->B1=New->B2=New->B3=0.0;
-               v1=maxwellianVelocity(LL->temperature)/velocityC;
-               v2=maxwellianVelocity(LL->temperature)/velocityC;
-               v3=maxwellianVelocity(LL->temperature)/velocityC;
-               New->p1=-D->gamma*D->beta+v1;
-               New->p2=v2;
-               New->p3=v3;
-               New->weight=1.0/LL->numberInCell;
-               LL->index+=1;
-               New->index=LL->index;            
-             } 		//end of randTest
-           }		//end of if(x,y nodes)
-         }		//end of for(xnodes,ynodes)  
-
-     } 				//End of for(j)
-     iter=iter+1;
-   }				//End of for(i)
 }
 
 void loadDefinedPlasma2D(Domain *D,LoadList *LL,int s)
@@ -319,6 +206,85 @@ void loadDefinedPlasma3D(Domain *D,LoadList *LL,int s)
    }			//End of for(n)
 }
 
+void loadMovingPolygonPlasma1D(Domain *D,LoadList *LL,int s,int iteration)
+{
+   int i,j,k,istart,iend,intNum,cnt,l,myrank,modeX;
+   double posX,v1,v2,v3,centerX,tmp,weight;
+   double ne,randTest,positionX,gaussCoefX,polyCoefX;
+   Particle ***particle;
+   particle=D->particle;
+   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+   ptclList *New,*p;   
+
+   istart=D->istart;
+   iend=D->iend;
+   j=k=0;
+   centerX=LL->centerX;
+   gaussCoefX=LL->gaussCoefX;
+   polyCoefX=LL->polyCoefX;
+   modeX=LL->modeX;
+   weight=1.0/LL->numberInCell;
+
+   srand(iteration*(myrank+1));
+
+   //position define      
+   i=iend-1;
+       gsl_qrng *q = gsl_qrng_alloc (gsl_qrng_sobol,1);
+
+       for(l=0; l<LL->xnodes-1; l++)
+         {
+           posX=(double)(i+D->minXSub-istart);
+
+           if(posX>=LL->xpoint[l] && posX<LL->xpoint[l+1])
+           {
+             ne=((LL->xn[l+1]-LL->xn[l])/(LL->xpoint[l+1]-LL->xpoint[l])*(posX-LL->xpoint[l])+LL->xn[l]);
+             tmp=applyFunctionX(modeX,centerX,posX,gaussCoefX,polyCoefX);
+             ne*=tmp;
+             ne*=LL->numberInCell;
+             intNum=(int)ne;
+             randTest=ne-intNum;
+             if(randTest>randomValue(1.0)) intNum++; else;
+             
+             cnt=0;
+             while(cnt<intNum)
+             {               
+//               positionX=randomValue(1.0);
+//               positionY=randomValue(1.0);
+               random1D_sobol(&positionX,q);
+
+               New = (ptclList *)malloc(sizeof(ptclList)); 
+               New->next = particle[i][j][k].head[s]->pt;
+               particle[i][j][k].head[s]->pt = New;
+ 
+               New->x = positionX;
+               New->oldX=i+positionX;
+               New->y = 0.0;
+               New->oldY=j+0.0;
+               New->z = 0.0;
+               New->oldZ=k+0.0;
+
+               New->E1=New->E2=New->E3=0.0;
+               New->B1=New->B2=New->B3=0.0;
+               v1=maxwellianVelocity(LL->temperature)/velocityC;
+               v2=maxwellianVelocity(LL->temperature)/velocityC;
+               v3=maxwellianVelocity(LL->temperature)/velocityC;
+               New->p1=-D->gamma*D->beta+v1;
+               New->p2=v2;
+               New->p3=v3;
+               New->weight=weight;
+               LL->index+=1;
+               New->index=LL->index;            
+               New->core=myrank; 
+
+               cnt++; 
+             }		//end of while(cnt)
+           }	
+         } 		//end of for(lnodes)  i
+       gsl_qrng_free(q);
+         
+}
+
 void loadMovingPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
 {
    int i,j,k,istart,iend,jstart,jend,kstart,kend,intNum,cnt,l,t,myrank;
@@ -352,6 +318,8 @@ void loadMovingPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
    i=iend-1;
      for(j=jstart; j<jend; j++)
      {
+       gsl_qrng *q = gsl_qrng_alloc (gsl_qrng_sobol,1);
+
        for(l=0; l<LL->xnodes-1; l++)
          for(t=0; t<LL->ynodes-1; t++)
          {
@@ -368,15 +336,17 @@ void loadMovingPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
              ne*=tmp;
              tmp=applyFunctionYZ(modeYZ,centerY,posY,centerZ,posZ,gaussCoefYZ,polyCoefYZ);
              ne*=tmp;
-             ne*=LL->numberInCell;	//it is the double number of superparticles.
+             ne*=LL->numberInCell;
              intNum=(int)ne;
              randTest=ne-intNum;
+             if(randTest>randomValue(1.0)) intNum++; else;
              
              cnt=0;
              while(cnt<intNum)
              {               
-               positionX=randomValue(1.0);
-               positionY=randomValue(1.0);
+//               positionX=randomValue(1.0);
+//               positionY=randomValue(1.0);
+               random2D_sobol(&positionX,&positionY,q);
 
                New = (ptclList *)malloc(sizeof(ptclList)); 
                New->next = particle[i][j][k].head[s]->pt;
@@ -404,37 +374,10 @@ void loadMovingPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
 
                cnt++; 
              }		//end of while(cnt)
-
-             if(randTest>randomValue(1.0))
-             {
-               positionX=randomValue(1.0);
-               positionY=randomValue(1.0);
-
-               New = (ptclList *)malloc(sizeof(ptclList)); 
-               New->next = particle[i][j][k].head[s]->pt;
-               particle[i][j][k].head[s]->pt = New;
- 
-               New->x = positionX;
-               New->oldX=i+positionX;
-               New->y = positionY;
-               New->oldY=j+positionY;
-               New->z = 0;
-               New->oldZ=k +0;
-               New->E1=New->E2=New->E3=0.0;
-               New->B1=New->B2=New->B3=0.0;
-               v1=maxwellianVelocity(LL->temperature)/velocityC;
-               v2=maxwellianVelocity(LL->temperature)/velocityC;
-               v3=maxwellianVelocity(LL->temperature)/velocityC;
-               New->p1=-D->gamma*D->beta+v1;
-               New->p2=v2;
-               New->p3=v3;
-               New->weight=1.0/LL->numberInCell;
-               LL->index+=1;
-               New->index=LL->index;            
-               New->core=myrank; 
-             }		//end of if(randTest)
            }	
-         } 		//end of for(lnodes)  
+         } 		//end of for(lnodes)  i
+       gsl_qrng_free(q);
+
      }			//End of for(i,j)
          
 }

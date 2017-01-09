@@ -157,8 +157,7 @@ int main(int argc, char *argv[])
        updateCurrent(D);
 
        if(iteration>=D.nx && D.moving==ON && D.boostOn==OFF 
-          && (iteration-D.nx)%D.shiftDuration!=0 )
-       {
+          && (iteration-D.nx)%D.shiftDuration!=0 )    {
          movingDomain(&D,iteration);
          LL=D.loadList;
          s=0;
@@ -170,15 +169,11 @@ int main(int argc, char *argv[])
          rearrangeParticles(&D);
          if(D.L>1)   particleShareX(D);   else	;
          if(D.M>1)   particleShareY(D);   else	;
-//         if(D.N>1)   particleShareZ(&D);
          removeEdge(D);
-       }
-       else
-       {
+       } else       {
           rearrangeParticles(&D);
           if(D.L>1)  particleShareX(D);   else	;
           if(D.M>1)  particleShareY(D);   else	;
-//          if(D.N>1)  particleShareZ(&D);
           removeEdge(D);
        }
 

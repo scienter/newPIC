@@ -21,17 +21,13 @@ void saveDump(Domain D,int iteration)
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
 
-  switch (D.fieldType)  {
-  case (Pukhov) :
-    if(D.saveDumpMode==HDF)  {
-      saveDumpFieldHDF(&D,iteration);
-      saveDumpParticleHDF(&D,iteration);
-      if(myrank==0)  {
-        printf("dumpField%d.h5\n",iteration);
-        printf("dumpParticle%d.h5\n",iteration);
-      }   else	;
-    }
-    break;
+  if(D.saveDumpMode==HDF)  {
+    saveDumpFieldHDF(&D,iteration);
+    saveDumpParticleHDF(&D,iteration);
+    if(myrank==0)  {
+      printf("dumpField%d.h5\n",iteration);
+      printf("dumpParticle%d.h5\n",iteration);
+    }   else	;
   }
 
 }
@@ -288,9 +284,31 @@ void saveDumpFieldHDF(Domain *D,int iteration)
       saveIntMeta(name,"/ny",&D->ny,1);
       saveIntMeta(name,"/nz",&D->nz,1);
     } else	;
+    MPI_Barrier(MPI_COMM_WORLD);
     
-//    MPI_Barrier(MPI_COMM_WORLD);
     switch((D->fieldType-1)*3+D->dimension) {
+    //1D
+    case (Split-1)*3+1:
+      nx=D->nx+5; 
+      calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
+      ny=1;  nySub=1; jstart=0; jend=1;
+      nz=1;  nzSub=1; kstart=0; kend=1;
+
+      offset[0]=(D->minXSub-D->minXDomain)+biasX;
+      offset[1]=0;
+      offset[2]=0;
+      
+      saveFieldComp(D->Ex,name,"/Ex",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Pr,name,"/Pr",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Pl,name,"/Pl",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Bx,name,"/Bx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Sr,name,"/Sr",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Sl,name,"/Sl",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Jx,name,"/Jx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Jy,name,"/Jy",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Jz,name,"/Jz",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      break;
+
     //2D
     case (Pukhov-1)*3+2:
       nx=D->nx+5;

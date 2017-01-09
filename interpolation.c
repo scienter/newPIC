@@ -32,18 +32,12 @@ void MPI_TransferF_Pukhov_Yplus(Domain *D
   switch((D->interpolationType-1)*3+D->dimension)  {
   //1D 1st
   case ((1-1)*3+1) :
-    if(D->L>1)  {
-      MPI_TransferF_Pukhov_Xminus(D,D->Ex,D->Pr,D->Pl,1,1,3);
-      MPI_TransferF_Pukhov_Xplus(D,D->Ex,D->Pr,D->Pl,1,1,3);
-      MPI_TransferF_Pukhov_Xminus(D,D->Bx,D->Sr,D->Sl,1,1,3);
-      MPI_TransferF_Pukhov_Xplus(D,D->Bx,D->Sr,D->Sl,1,1,3);
-    }  else	;
     interpolation1D_Split_1st(D,Ext);
     break;
   case ((1-1)*3+2) :
     if(D->L>1)  {
-      MPI_TransferF_Pukhov_Xminus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
-      MPI_TransferF_Pukhov_Xplus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
+      MPI_Transfer3F_Xminus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
+      MPI_Transfer3F_Xplus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
     } else	;
     if(D->M>1)  {
       MPI_TransferF_Pukhov_Yminus(D,D->BxNow,D->ByNow,D->BzNow,D->nxSub+5,1,3);
@@ -54,8 +48,8 @@ void MPI_TransferF_Pukhov_Yplus(Domain *D
     break;
   case ((2-1)*3+2) :
     if(D->L>1)  {
-      MPI_TransferF_Pukhov_Xminus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
-      MPI_TransferF_Pukhov_Xplus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
+      MPI_Transfer3F_Xminus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
+      MPI_Transfer3F_Xplus(D,D->BxNow,D->ByNow,D->BzNow,D->nySub+5,1,3);
     }
     if(D->M>1)  {
       MPI_TransferF_Pukhov_Yminus(D,D->BxNow,D->ByNow,D->BzNow,D->nxSub+5,1,3);

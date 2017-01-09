@@ -60,7 +60,8 @@ void updateCurrent(Domain D)
     if(D.L>1)  {
       MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
       MPI_TransferJ_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
-      MPI_TransferF_Pukhov_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+      MPI_Transfer3F_Xplus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+      MPI_Transfer3F_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
     }  else	;
     break;
   case ((1-1)*3+2) :    
@@ -77,11 +78,14 @@ void updateCurrent(Domain D)
     if(D.L>1)  {
       MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
       MPI_TransferJ_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
-      MPI_TransferF_Pukhov_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
     }  else	;
     if(D.M>1)  {
       MPI_TransferJ_Yplus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
       MPI_TransferJ_Yminus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
+    }  else	;
+    if(D.L>1)  {
+      MPI_Transfer3F_Xplus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
+      MPI_Transfer3F_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
     }  else	;
     break;
   case ((2-1)*3+2) :

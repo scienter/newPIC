@@ -45,20 +45,32 @@ void saveEFieldHDF(Domain *D,int iteration)
     if(myrank==0)     {
       file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
       H5Fclose(file_id);
-    }    else        ;
-    if(myrank==0)  {
       saveIntMeta(name,"/nx",&nx,1);
       saveIntMeta(name,"/ny",&ny,1);
       saveIntMeta(name,"/nz",&nz,1);
     } else      ;
     MPI_Barrier(MPI_COMM_WORLD);
 
-    switch(D->fieldType) {
-    case Pukhov:
-      offset[0]=D->minXSub-D->minXDomain;
-      offset[1]=D->minYSub-D->minYDomain;
-      offset[2]=D->minZSub-D->minZDomain;
+    offset[0]=D->minXSub-D->minXDomain;
+    offset[1]=D->minYSub-D->minYDomain;
+    offset[2]=D->minZSub-D->minZDomain;
 
+    switch(D->fieldType) {
+    case Split:
+      saveFieldComp(D->Ex,name,"/Ex",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Pr,name,"/Pr",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Pl,name,"/Pl",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+
+      if(myrank==0)   {
+        saveCoordHDF(D,name);
+        sprintf(fileName,"fieldE%d",iteration);
+        Efield_xdmf(D->dimension,fileName,nx,ny,nz);
+        printf("%s\n",name); 
+      }	 else  ;
+
+      break;
+
+    case Pukhov:
       saveFieldComp(D->Ex,name,"/Ex",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
       saveFieldComp(D->Ey,name,"/Ey",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
       saveFieldComp(D->Ez,name,"/Ez",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
@@ -70,7 +82,7 @@ void saveEFieldHDF(Domain *D,int iteration)
         printf("%s\n",name); 
       }	 else  ;
       break;
-    }   //End of switch (dimension)
+    }   //End of switch (fieldType)
 }
 
 void saveBFieldHDF(Domain *D,int iteration)
@@ -105,20 +117,32 @@ void saveBFieldHDF(Domain *D,int iteration)
     if(myrank==0)     {
       file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
       H5Fclose(file_id);
-    }    else        ;
-    if(myrank==0)  {
       saveIntMeta(name,"/nx",&nx,1);
       saveIntMeta(name,"/ny",&ny,1);
       saveIntMeta(name,"/nz",&nz,1);
     } else      ;
     MPI_Barrier(MPI_COMM_WORLD);
 
-    switch(D->fieldType) {
-    case Pukhov:
-      offset[0]=D->minXSub-D->minXDomain;
-      offset[1]=D->minYSub-D->minYDomain;
-      offset[2]=D->minZSub-D->minZDomain;
+    offset[0]=D->minXSub-D->minXDomain;
+    offset[1]=D->minYSub-D->minYDomain;
+    offset[2]=D->minZSub-D->minZDomain;
 
+    switch(D->fieldType) {
+
+    case Split:
+      saveFieldComp(D->Bx,name,"/Bx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Sr,name,"/Sr",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Sl,name,"/Sl",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+
+      if(myrank==0)   {
+        saveCoordHDF(D,name);
+        sprintf(fileName,"fieldB%d",iteration);
+        Efield_xdmf(D->dimension,fileName,nx,ny,nz);
+        printf("%s\n",name); 
+      }	 else  ;
+      break;
+
+    case Pukhov:
       saveFieldComp(D->Bx,name,"/Bx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
       saveFieldComp(D->By,name,"/By",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
       saveFieldComp(D->Bz,name,"/Bz",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);

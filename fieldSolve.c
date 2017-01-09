@@ -5,7 +5,8 @@
 #include "constants.h"
 
 void absorb2D_UD(Domain *D,double *upr,double *btr,double *upd,double *btd,double y,double upL,double bottomL,double LdU,double LdB,double rr,double rd);
-void solve1D_Split(Domain *D);
+void solveR1D_Split(Domain *D);
+void solveL1D_Split(Domain *D);
 
 void fieldSolve(Domain D,double t)
 {
@@ -15,8 +16,10 @@ void fieldSolve(Domain D,double t)
   void Esolve2D_Pukhov(Domain *D);
   void Bsolve2D_Yee(Domain *D);
   void Esolve2D_Yee(Domain *D);
-  void MPI_TransferF_Pukhov_Xminus();
-  void MPI_TransferF_Pukhov_Xplus();
+  void MPI_Transfer3F_Xminus();
+  void MPI_Transfer3F_Xplus();
+  void MPI_Transfer6F_Xminus();
+  void MPI_Transfer6F_Xplus();
   void MPI_TransferF_Pukhov_Yminus();
   void MPI_TransferF_Pukhov_Yplus();
 
@@ -39,11 +42,12 @@ void fieldSolve(Domain D,double t)
       }
     }
 
-    solve1D_Split(&D);
+    solveR1D_Split(&D);
+    solveL1D_Split(&D);
     if(D.L>1) {
-      MPI_TransferF_Pukhov_Xplus(&D,D.Ex,D.Pr,D.Sr,1,1,3);
-      MPI_TransferF_Pukhov_Xminus(&D,D.Bx,D.Pl,D.Sl,1,1,3);
-    }
+      MPI_Transfer6F_Xplus(&D,D.Ex,D.Pr,D.Sr,D.Bx,D.Pl,D.Sl,1,1,3);
+      MPI_Transfer6F_Xminus(&D,D.Ex,D.Pr,D.Sr,D.Bx,D.Pl,D.Sl,1,1,3);
+    } else ;
     break;
 
   //split 2D
@@ -102,8 +106,8 @@ void fieldSolve(Domain D,double t)
   case (Yee-1)*3+2:
     Esolve2D_Yee(&D);
     if(D.L>1)  {
-      MPI_TransferF_Pukhov_Xminus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
-      MPI_TransferF_Pukhov_Xplus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
+      MPI_Transfer3F_Xminus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
+      MPI_Transfer3F_Xplus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
       MPI_TransferF_Pukhov_Yminus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
@@ -123,8 +127,8 @@ void fieldSolve(Domain D,double t)
 
     Bsolve2D_Yee(&D);
     if(D.L>1)  {
-      MPI_TransferF_Pukhov_Xminus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
-      MPI_TransferF_Pukhov_Xplus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
+      MPI_Transfer3F_Xminus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
+      MPI_Transfer3F_Xplus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
       MPI_TransferF_Pukhov_Yminus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
@@ -136,8 +140,8 @@ void fieldSolve(Domain D,double t)
   case (Pukhov-1)*3+2:
     Esolve2D_Pukhov(&D);
     if(D.L>1)  {
-      MPI_TransferF_Pukhov_Xminus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
-      MPI_TransferF_Pukhov_Xplus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
+      MPI_Transfer3F_Xminus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
+      MPI_Transfer3F_Xplus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
       MPI_TransferF_Pukhov_Yminus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
@@ -157,8 +161,8 @@ void fieldSolve(Domain D,double t)
 
     Bsolve2D_Pukhov(&D);
     if(D.L>1)  {
-      MPI_TransferF_Pukhov_Xminus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
-      MPI_TransferF_Pukhov_Xplus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
+      MPI_Transfer3F_Xminus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
+      MPI_Transfer3F_Xplus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
       MPI_TransferF_Pukhov_Yminus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
@@ -171,34 +175,40 @@ void fieldSolve(Domain D,double t)
   }
 }
 
-void solve1D_Split(Domain *D)
+void solveR1D_Split(Domain *D)
 {
   int i,j,k,istart,iend,nxSub;
   double dx,dt;
-  double nowPr,nowSr,prevPr,prevSr;
 
   dx=D->dx;          dt=D->dt;
   istart=D->istart;  iend=D->iend;
   nxSub=D->nxSub;
 
   j=k=0;
-  nowPr=D->Pr[istart-1][j][k];
-  nowSr=D->Sr[istart-1][j][k];
-  for(i=istart; i<iend; i++)
+  for(i=iend-1; i>=istart; i--)
   {
-    D->Ex[i][j][k]+=-2*pi*dt*D->Jx[i][j][k];
-    prevPr=nowPr;
-    nowPr=D->Pr[i][j][k];
-    D->Pr[i][j][k]=prevPr-pi*dt*D->Jy[i][j][k];
-    D->Pl[i][j][k]=D->Pl[i+1][j][k]-pi*dt*D->Jy[i+1][j][k];
-
-    prevSr=nowSr;
-    nowSr=D->Sr[i][j][k];
-    D->Sr[i][j][k]=prevSr-pi*dt*D->Jz[i][j][k];
-    D->Sl[i][j][k]=D->Sl[i+1][j][k]-pi*dt*D->Jz[i+1][j][k];
+    D->Ex[i][j][k]+=-2.0*pi*dt*D->Jx[i][j][k];
+    D->Pr[i][j][k]=D->Pr[i-1][j][k]-pi*dt*D->Jy[i][j][k];
+    D->Sr[i][j][k]=D->Sr[i-1][j][k]-pi*dt*D->Jz[i][j][k];
   }  
 }
 
+void solveL1D_Split(Domain *D)
+{
+  int i,j,k,istart,iend,nxSub;
+  double dx,dt;
+
+  dx=D->dx;          dt=D->dt;
+  istart=D->istart;  iend=D->iend;
+  nxSub=D->nxSub;
+
+  j=k=0;
+  for(i=istart; i<iend; i++)
+  {
+    D->Pl[i][j][k]=D->Pl[i+1][j][k]-pi*dt*D->Jy[i+1][j][k];
+    D->Sl[i][j][k]=D->Sl[i+1][j][k]-pi*dt*D->Jz[i+1][j][k];
+  }  
+}
 
 void Bsolve2D_Pukhov(Domain *D)
 {

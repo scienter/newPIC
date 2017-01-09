@@ -14,6 +14,7 @@ void MPI_TransferRho_Yplus(Domain *D,double ***f1,int nx,int nz,int share);
 void calParameter(int nx,int *istart,int *iend,int *nxSub,int rankX,int *biasX,int L);
 void saveFieldComp(double ***data,char *fileName,char *dataName,int nx,int ny,int nz,int nxSub,int nySub,int nzSub,int istart,int iend,int jstart,int jend,int kstart,int kend,int *offSet);
 void saveIntMeta(char *fileName,char *dataName,int *data,int dataCnt);
+void solveDensity1D(Domain *D,int s,double coef);
 void solveDensity2D(Domain *D,int s,double coef);
 void solveDensity3D(Domain *D,int s,double coef);
 void saveCoordHDF(Domain *D,char *fileName);
@@ -86,6 +87,7 @@ void saveDenParticleHDF(Domain *D,int iteration)
         file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
         H5Fclose(file_id);
       }    else        ;
+      MPI_Barrier(MPI_COMM_WORLD);
       if(myrank==0)  {
         saveIntMeta(name,"/nx",&nx,1);
         saveIntMeta(name,"/ny",&ny,1);
@@ -271,7 +273,7 @@ void saveDenParticleHDF(Domain *D,int iteration)
     }   //End of switch (dimension)
 }
 
-
+//lala
 void saveDensityHDF(Domain *D,int iteration)
 {
     int i,j,k,s,istart,iend,jstart,jend,kstart,kend,nx,ny,nz;
@@ -307,40 +309,55 @@ void saveDensityHDF(Domain *D,int iteration)
     s=0;
     rho0 = (double *)malloc((D->nSpecies)*sizeof(double ));
     LL=D->loadList;
-    while(LL->next)
-    {
+    while(LL->next)    {
       if(LL->charge<0)	charge=-1.0*LL->charge;
       else 	        charge=LL->charge;
-      rho0[s]=1.0;
+      rho0[s]=1.0*LL->density;
       LL=LL->next;
       s++;
     }
 
-    switch(D->dimension) {
-    //2D
-    case 2:
-      nx=D->nx;
-      ny=D->ny;
-      nz=D->nz;
+    nx=D->nx;  ny=D->ny;    nz=D->nz;
 
-      offset[0]=D->minXSub-D->minXDomain;
-      offset[1]=D->minYSub-D->minYDomain;
-      offset[2]=0;
+    offset[0]=D->minXSub-D->minXDomain;
+    offset[1]=D->minYSub-D->minYDomain;
+    offset[2]=D->minZSub-D->minZDomain;
 
-      for(s=0; s<D->nSpecies; s++)
-      {
-        sprintf(name,"%ddensity%d.h5",s,iteration);
-        if(myrank==0)        {
-          file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
-          H5Fclose(file_id);
-        }   else ;
+    for(s=0; s<D->nSpecies; s++)
+    {
+      sprintf(name,"%ddensity%d.h5",s,iteration);
 
-        if(myrank==0)  {
-          saveIntMeta(name,"/nx",&nx,1);
-          saveIntMeta(name,"/ny",&ny,1);
-          saveIntMeta(name,"/nz",&nz,1);
-        } else      ;
+      if(myrank==0)        {
+        file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
+        H5Fclose(file_id);
+        saveIntMeta(name,"/nx",&nx,1);
+        saveIntMeta(name,"/ny",&ny,1);
+        saveIntMeta(name,"/nz",&nz,1);
+      } else      ;
+      MPI_Barrier(MPI_COMM_WORLD);
 
+      switch(D->dimension) {
+      //1D
+      case 1:
+        solveDensity1D(D,s,rho0[s]);
+        if(D->L>1)  {
+          MPI_TransferRho_Xplus(D,D->Rho,1,1,3);
+          MPI_TransferRho_Xminus(D,D->Rho,1,1,3);
+        }  else     ;
+
+        sprintf(dataName,"%d",s);
+        saveFieldComp(D->Rho,name,dataName,nx,1,1,nxSub,1,1,istart,iend,0,1,0,1,offset);
+
+        if(myrank==0)   {
+          saveCoordHDF(D,name);
+          sprintf(fileName,"%ddensity%d",s,iteration);
+          density_xdmf(1,fileName,nx,ny,nz,s);
+          printf("%s\n",name);
+        }  else  ;
+        break;
+
+      //2D
+      case 2:
         solveDensity2D(D,s,rho0[s]);
         if(D->L>1)  {
           MPI_TransferRho_Xplus(D,D->Rho,nySub+5,1,3);
@@ -351,7 +368,7 @@ void saveDensityHDF(Domain *D,int iteration)
           MPI_TransferRho_Yminus(D,D->Rho,nxSub+5,1,3);
         }  else     ;
 
-        sprintf(dataName,"density%d",s);
+        sprintf(dataName,"%d",s);
         saveFieldComp(D->Rho,name,dataName,nx,ny,1,nxSub,nySub,1,istart,iend,jstart,jend,0,1,offset);
 
         if(myrank==0)   {
@@ -361,13 +378,50 @@ void saveDensityHDF(Domain *D,int iteration)
           printf("%s\n",name);
         }  else  ;
 
-      }		//End of for(s)
-      break;
+        break;
+      }   //End of switch (dimension)
 
-    }   //End of switch (dimension)
-
+    }		//End of for(s)
     free(rho0);
 }
+
+void solveDensity1D(Domain *D,int s,double coef)
+{
+  int i,j,k,ii,jj,istart,iend,jstart,jend;
+  double Wx[4];
+  double x,x1,x2,x3,x4,y,y1,y2,y3,y4,weight;
+  Particle ***particle;
+  particle=D->particle;
+  ptclList *p;
+
+  istart=D->istart;
+  iend=D->iend;
+
+  j=k=0;
+  for(i=0; i<iend+3; i++)
+      D->Rho[i][j][k]=0.0;
+
+  for(i=istart; i<iend; i++)
+    {
+      p=particle[i][j][k].head[s]->pt;
+      while(p)
+      {
+        weight=p->weight;
+        x=p->x;
+        x1=1+x;
+        x2=x;
+        x3=1-x;
+        x4=2-x;
+        Wx[0]=(2-x1)*(2-x1)*(2-x1)/6.0;
+        Wx[1]=(4-6*x2*x2+3*x2*x2*x2)/6.0;
+        Wx[2]=(4-6*x3*x3+3*x3*x3*x3)/6.0;
+        Wx[3]=(2-x4)*(2-x4)*(2-x4)/6.0;
+        for(ii=0; ii<4; ii++)
+            D->Rho[i-1+ii][j][k]+=Wx[ii]*coef*weight;
+        p=p->next;
+      }
+    }
+}   
 
 void solveDensity2D(Domain *D,int s,double coef)
 {
@@ -511,6 +565,22 @@ void saveCoordHDF(Domain *D,char *fileName)
     file_id=H5Fopen(name,H5F_ACC_RDWR,H5P_DEFAULT);
 
     switch(D->dimension) {
+    //1D
+    case 1:
+      dimx[0]=nx;
+      xtic=(double *)malloc(nx*sizeof(double));
+      for(i=0;i<nx;i++)
+        xtic[i]=(i+D->minXDomain)*D->lambda*D->dx;
+
+      filespace=H5Screate_simple(1,dimx,NULL);
+      dset_id=H5Dcreate2(file_id,coorName[1],H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+      status = H5Dwrite(dset_id, H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,xtic);
+      H5Dclose(dset_id);
+      H5Sclose(filespace);
+
+      free(xtic);
+      break;
+
     //2D
     case 2:
       dimx[0]=nx;
@@ -536,6 +606,7 @@ void saveCoordHDF(Domain *D,char *fileName)
       free(ytic);
       break;
 
+    //3D
     case 3:
       dimx[0]=nx;
       dimy[0]=ny;
@@ -587,6 +658,27 @@ void density_xdmf(int dimension,char *fileName,int nx,int ny,int nz,int s)
     fprintf(xmf, "   <Grid Name=\"mesh\" GridType=\"Uniform\">\n");
 
     switch (dimension)  {
+    //1D
+    case 1 :
+      fprintf(xmf, "     <Topology TopologyType=\"1DRectMesh\" NumberOfElements=\"%d %d\"/>\n", ny,nx);
+      fprintf(xmf, "     <Geometry GeometryType=\"VX\">\n");
+      fprintf(xmf, "       <DataItem Dimensions=\"%d\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n",nx);
+      fprintf(xmf, "        %s.h5:/X\n",fileName);
+      fprintf(xmf, "       </DataItem>\n");
+      fprintf(xmf, "     </Geometry>\n");
+
+      fprintf(xmf, "     <Attribute Name=\"/%d\" AttributeType=\"Scalar\" Center=\"Node\">\n",s);
+      fprintf(xmf, "       <DataItem Dimensions=\"%d\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n",nx);
+      fprintf(xmf, "        %s.h5:/%d\n",fileName,s);
+      fprintf(xmf, "       </DataItem>\n");
+      fprintf(xmf, "     </Attribute>\n");
+      fprintf(xmf, "   </Grid>\n");
+      fprintf(xmf, " </Domain>\n");
+      fprintf(xmf, "</Xdmf>\n");
+      fclose(xmf);
+      break;
+
+    //2D
     case 2 :
       fprintf(xmf, "     <Topology TopologyType=\"2DRectMesh\" NumberOfElements=\"%d %d\"/>\n", ny,nx);
       fprintf(xmf, "     <Geometry GeometryType=\"VXVY\">\n");
@@ -598,9 +690,9 @@ void density_xdmf(int dimension,char *fileName,int nx,int ny,int nz,int s)
       fprintf(xmf, "       </DataItem>\n");
       fprintf(xmf, "     </Geometry>\n");
 
-      fprintf(xmf, "     <Attribute Name=\"/density%d\" AttributeType=\"Scalar\" Center=\"Node\">\n",s);
-      fprintf(xmf, "       <DataItem Dimensions=\"%d %d\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n",nx,ny);
-      fprintf(xmf, "        %s.h5:/density%d\n",fileName,s);
+      fprintf(xmf, "     <Attribute Name=\"/0%d\" AttributeType=\"Scalar\" Center=\"Node\">\n",s);
+      fprintf(xmf, "       <DataItem Dimensions=\"%d\" NumberType=\"Float\" Precision=\"4\" Format=\"HDF\">\n",nx);
+      fprintf(xmf, "        %s.h5:/%d\n",fileName,s);
       fprintf(xmf, "       </DataItem>\n");
       fprintf(xmf, "     </Attribute>\n");
       fprintf(xmf, "   </Grid>\n");

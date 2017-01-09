@@ -350,46 +350,47 @@ void saveDensity(Domain *D,int iteration)
     }
 
     switch (D->dimension)  {
+    //1D
     case 1 :
       j=k=0;
-      for(i=0; i<iend+3; i++)
-        D->Rho[i][j][k]=0.0;
-      
       //initializing density
-      for(i=istart; i<iend; i++)
-          for(s=0; s<D->nSpecies; s++)
-          {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)
-            {
-              weight=p->weight;
-              x=p->x;
-              i1=(int)(i+x+0.5);
-              x=i+x-i1;
-              Wx[0]=0.5*(0.5-x)*(0.5-x);
-              Wx[1]=0.75-x*x;
-              Wx[2]=0.5*(x+0.5)*(x+0.5);
-
-                for(ii=0; ii<3; ii++)
-                {
-                  l=i1-1+ii;
-                  if(istart<=l && l<iend)
-                    D->Rho[l][j][k]+=Wx[ii]*rho0[s]*weight;
-                }
-              p=p->next;
-            }
-          }
-
-      sprintf(name,"density%d_%d",iteration,myrank);
-      out = fopen(name,"w");    
-      for(i=istart-1; i<=iend; i++)
+      for(s=0; s<D->nSpecies; s++)
       {
+        for(i=0; i<iend+3; i++)   D->Rho[i][j][k]=0.0;
+      
+        for(i=istart; i<iend; i++)
+        {
+          p=particle[i][j][k].head[s]->pt;
+          while(p)            {
+            weight=p->weight;
+            x=p->x;
+            i1=(int)(i+x+0.5);
+            x=i+x-i1;
+            Wx[0]=0.5*(0.5-x)*(0.5-x);
+            Wx[1]=0.75-x*x;
+            Wx[2]=0.5*(x+0.5)*(x+0.5);
+
+            for(ii=0; ii<3; ii++)  {
+              l=i1-1+ii;
+              if(istart<=l && l<iend)
+                D->Rho[l][j][k]+=Wx[ii]*rho0[s]*weight;
+              else	;
+            }
+            p=p->next;
+          }
+        }
+
+        sprintf(name,"%ddensity%d_%d",s,iteration,myrank);
+        out = fopen(name,"w");    
+        for(i=istart-1; i<=iend; i++)     {
           x=(i-istart+D->minXSub)*D->dx*D->lambda;
           fprintf(out,"%g %g\n",x,D->Rho[i][j][k]);    
-      }
-      fclose(out);
-
+        }
+        fclose(out);
+      }		//End for(S)
       break;
+
+    //2D
     case 2 :
       k=0;
       //initializing density
@@ -716,7 +717,7 @@ void saveField(Domain *D,int iteration)
 {
     int i,j,k,istart,iend,jstart,jend,kstart,kend;
     char name[100];
-    double x,y,z,Ex,Ey,Ez,Bx,By,Bz,factor;
+    double x,y,z,Ex,Ey,Ez,Bx,By,Bz,Pr,Sr,Pl,Sl,factor;
     FILE *out,*out1;
     int myrank, nprocs;    
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
@@ -739,12 +740,12 @@ void saveField(Domain *D,int iteration)
       for(i=istart; i<iend; i++)      {
         x=(i-2+D->minXSub)*D->dx*D->lambda;
         Ex=D->Ex[i][j][k];    
-        Ey=D->Pr[i][j][k]+D->Pl[i][j][k];
-        Ez=D->Sr[i][j][k]+D->Sl[i][j][k];
+        Pr=D->Pr[i][j][k];
+        Pl=D->Sr[i][j][k];
         Bx=0.0;    
-        By=D->Sl[i][j][k]-D->Sr[i][j][k];
-        Bz=D->Pr[i][j][k]-D->Pl[i][j][k];
-        fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Ey,Ez,Bx,By,Bz);
+        Sr=D->Sl[i][j][k];
+        Sl=D->Pr[i][j][k];
+        fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Pr,Pl,Bx,Sr,Sl);
       }
       fclose(out);
       break;

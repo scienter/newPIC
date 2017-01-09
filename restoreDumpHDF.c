@@ -76,17 +76,30 @@ void restoreDumpHDF(Domain *D,int iteration)
     MPI_Bcast(&D->minXDomain,1,MPI_INT,0,MPI_COMM_WORLD);
 
     switch((D->fieldType-1)*3+D->dimension) {
+    //1D
+    case (Split-1)*3+1:
+      nx=D->nx+5; nxSub+=5; istart=0; iend+=3; 
+      ny=1; nySub=1; jstart=0; jend=1;
+      nz=1; nzSub=1; kstart=0; kend=1;
+      offset[0]=D->minXSub;
+      offset[1]=0;
+      offset[2]=0;
+      
+      restoreFieldComp(D->Ex,name,"/Ex",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Pr,name,"/Pr",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Pl,name,"/Pl",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Bx,name,"/Bx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Sr,name,"/Sr",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Sl,name,"/Sl",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Jx,name,"/Jx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Jy,name,"/Jy",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      restoreFieldComp(D->Jz,name,"/Jz",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      break;
+
     //2D
     case (Pukhov-1)*3+2:
-      ny=D->ny+5;      
-      nx=D->nx+5;     
-      istart=0;
-      iend+=3; 
-      jstart=0;
-      jend+=3;
-      nxSub+=5;
-      nySub+=5;
-
+      nx=D->nx+5; nxSub+=5; istart=0; iend+=3; 
+      ny=D->ny+5; nySub+=5; jstart=0; jend+=3;
       offset[0]=D->minXSub;
       offset[1]=D->minYSub-D->minYDomain;
       offset[2]=0;

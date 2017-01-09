@@ -359,7 +359,7 @@ void parameterSetting(Domain *D,External *Ext, char *input)
    if(D->fieldType==Split) {
      D->dt=D->dx; 
      D->dtRatio=1.0;
-     D->shiftDuration=1;
+     D->shiftDuration=D->maxStep+D->resolX;
    } else {
      D->dt=D->dx*D->dtRatio;
      D->shiftDuration=(int)(1.0/(1.0-D->dtRatio));
