@@ -166,56 +166,6 @@ void boundary(Domain *D,External *Ext)
       D->numMinusY=3*nxSub1D*1*3;
       D->minusY = (double *)malloc(D->numMinusY*sizeof(double ));
       break;
-/*
-    case 2 :
-      //first 3 is 3 field variables, 2nd 1 is k, 3rd 1 is 1 layer.
-      D->numPlusYC=3*(D->nx+5)*1*1;
-      D->plusYC = (double *)malloc(D->numPlusYC*sizeof(double ));
-      D->numMinusYC=3*(D->nx+5)*1*1;
-      D->minusYC = (double *)malloc(D->numMinusYC*sizeof(double ));
-
-      //first 6 is 6 field variables, 2nd 1 is k, 3rd 2 or 3 is layer.
-      D->numPlusY=6*(D->nx+5)*1*2;
-      D->plusY = (double *)malloc(D->numPlusY*sizeof(double ));
-      D->numMinusY=6*(D->nx+5)*1*3;
-      D->minusY = (double *)malloc(D->numMinusY*sizeof(double ));
-
-      //density : first 1 is 1 variable.
-      D->numPlusDenY=1*(D->nx+5)*1*3;
-      D->plusDenY = (double *)malloc(D->numPlusDenY*sizeof(double ));
-      D->numMinusDenY=1*(D->nx+5)*1*2;
-      D->minusDenY = (double *)malloc(D->numMinusDenY*sizeof(double ));
-    break;
-    case 3 :
-      D->numPlusYC=3*(D->nx+5)*(D->nzSub+5)*1;
-      D->plusYC = (double *)malloc(D->numPlusYC*sizeof(double ));
-      D->numMinusYC=3*(D->nx+5)*(D->nzSub+5)*1;
-      D->minusYC = (double *)malloc(D->numMinusYC*sizeof(double ));
-      D->numPlusZC=3*(D->nx+5)*(D->nySub+5)*1;
-      D->plusZC = (double *)malloc(D->numPlusZC*sizeof(double ));
-      D->numMinusZC=3*(D->nx+5)*(D->nySub+5)*1;
-      D->minusZC = (double *)malloc(D->numPlusZC*sizeof(double ));
-
-      D->numPlusY=6*(D->nx+5)*(D->nzSub+5)*2;
-      D->plusY = (double *)malloc(D->numPlusY*sizeof(double ));
-      D->numMinusY=6*(D->nx+5)*(D->nzSub+5)*3;
-      D->minusY = (double *)malloc(D->numMinusY*sizeof(double ));
-      D->numPlusZ=6*(D->nx+5)*(D->nySub+5)*2;
-      D->plusZ = (double *)malloc(D->numPlusZ*sizeof(double ));
-      D->numMinusZ=6*(D->nx+5)*(D->nySub+5)*3;
-      D->minusZ = (double *)malloc(D->numMinusZ*sizeof(double ));
-
-      //density : first 1 is 1 variable.
-      D->numPlusDenY=1*(D->nx+5)*(D->nzSub+5)*3;
-      D->plusDenY = (double *)malloc(D->numPlusDenY*sizeof(double ));
-      D->numMinusDenY=1*(D->nx+5)*(D->nzSub+5)*2;
-      D->minusDenY = (double *)malloc(D->numMinusDenY*sizeof(double ));
-      D->numPlusDenZ=1*(D->nx+5)*(D->nySub+5)*3;
-      D->plusDenZ = (double *)malloc(D->numPlusDenZ*sizeof(double ));
-      D->numMinusDenZ=1*(D->nx+5)*(D->nySub+5)*2;
-      D->minusDenZ = (double *)malloc(D->numMinusDenZ*sizeof(double ));
-    break;
-*/
     }    
 
     // current J trasffering boundary
@@ -236,18 +186,6 @@ void boundary(Domain *D,External *Ext)
       D->numMinusYJ=3*nxSub1D*1*2;
       D->YminusJ = (double *)malloc(D->numMinusYJ*sizeof(double ));
       break;
-/*
-    case 3 :
-      numberData=3*3*(D->nx+5)*(D->nzSub+5);
-      D->YplusJ=(double *)malloc(numberData*sizeof(double ));
-      numberData=2*3*(D->nx+5)*(D->nzSub+5);
-      D->YminusJ=(double *)malloc(numberData*sizeof(double ));
-      numberData=3*3*(D->nx+5)*(D->nySub+5);
-      D->ZplusJ=(double *)malloc(numberData*sizeof(double ));
-      numberData=2*3*(D->nx+5)*(D->nySub+5);
-      D->ZminusJ=(double *)malloc(numberData*sizeof(double ));
-      break;
-*/
     default :
       printf("In boundary's share J, what dimension(%d)?\n",D->dimension);
     }
@@ -275,9 +213,6 @@ void boundary(Domain *D,External *Ext)
        D->JxOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
        D->JyOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
        D->JzOld=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
-//       D->JxBoost=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->JyBoost=memoryAsign(nxSub1D,nySub2D,nzSub3D);
-//       D->JzBoost=memoryAsign(nxSub1D,nySub2D,nzSub3D);
        break;
 
      case Yee :
@@ -294,6 +229,7 @@ void boundary(Domain *D,External *Ext)
        D->Jy=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
        D->Jz=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
        break;
+
      case Pukhov :
        D->Ex=memoryAsign(nxSub1D,nySub2D,nzSub3D);
        D->Ey=memoryAsign(nxSub1D,nySub2D,nzSub3D);
@@ -308,6 +244,7 @@ void boundary(Domain *D,External *Ext)
        D->Jy=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
        D->Jz=memoryAsignJ(nxSub1D,nySub2D,nzSub3D);
        break;
+
      default :
        printf("what field type?\n");
      }
@@ -335,8 +272,7 @@ void boundary(Domain *D,External *Ext)
      }
 
      // setting up particle's pointer
-     if(D->dimension==1)
-     {
+     if(D->dimension==1)     {
        j=k=0;
        //i starts at 0 because of boost frame
        for(i=0; i<D->iend+1; i++)     {
@@ -346,30 +282,22 @@ void boundary(Domain *D,External *Ext)
            D->particle[i][j][k].head[s]->pt = NULL;
          }
        }
-     }
-     else if(D->dimension==2)
-     {
+     } else if(D->dimension==2)   {
        k=0;
        for(i=0; i<D->iend+1; i++)	//i starts at 0 because of boost frame
-         for(j=D->jstart-1; j<D->jend+1; j++)
-         {
+         for(j=D->jstart-1; j<D->jend+1; j++)   {
            D->particle[i][j][k].head = (ptclHead **)malloc(D->nSpecies*sizeof(ptclHead *));
-           for(s=0; s<D->nSpecies; s++)
-           {
+           for(s=0; s<D->nSpecies; s++)           {
              D->particle[i][j][k].head[s] = (ptclHead *)malloc(sizeof(ptclHead));
              D->particle[i][j][k].head[s]->pt = NULL;
            }
          }
-     }
-     else if(D->dimension==3)
-     {
+     } else if(D->dimension==3)     {
        for(i=0; i<D->iend+1; i++)	//i starts at 0 because of boost frame
          for(j=D->jstart-1; j<D->jend+1; j++)
-           for(k=D->kstart-1; k<D->kend+1; k++)
-           {
+           for(k=D->kstart-1; k<D->kend+1; k++)           {
              D->particle[i][j][k].head = (ptclHead **)malloc(D->nSpecies*sizeof(ptclHead *));
-             for(s=0; s<D->nSpecies; s++)
-             {
+             for(s=0; s<D->nSpecies; s++)             {
                D->particle[i][j][k].head[s] = (ptclHead *)malloc(sizeof(ptclHead));
                D->particle[i][j][k].head[s]->pt = NULL;
              }
@@ -426,8 +354,7 @@ double ***memoryAsign(int nx, int ny, int nz)
    double ***field;
 
    field = (double ***)malloc((nx)*sizeof(double **));
-   for(i=0; i<nx; i++)
-   {
+   for(i=0; i<nx; i++)   {
      field[i] = (double **)malloc((ny)*sizeof(double *));
      for(j=0; j<ny; j++)
        field[i][j] = (double *)malloc((nz)*sizeof(double ));
@@ -435,9 +362,8 @@ double ***memoryAsign(int nx, int ny, int nz)
    
    for(i=0; i<nx; i++)
      for(j=0; j<ny; j++)
-       for(k=0; k<nz; k++){
+       for(k=0; k<nz; k++)
          field[i][j][k]=0.0;
-       }
 
    return field;
 }
@@ -448,8 +374,7 @@ double ***memoryAsignJ(int nx, int ny, int nz)
    double ***current;
 
    current = (double ***)malloc((nx)*sizeof(double **));
-   for(i=0; i<nx; i++)
-   {
+   for(i=0; i<nx; i++)   {
      current[i] = (double **)malloc((ny)*sizeof(double *));
      for(j=0; j<ny; j++)
        current[i][j] = (double *)malloc((nz)*sizeof(double ));
@@ -457,9 +382,8 @@ double ***memoryAsignJ(int nx, int ny, int nz)
    
    for(i=0; i<nx; i++)
      for(j=0; j<ny; j++)
-       for(k=0; k<nz; k++){
+       for(k=0; k<nz; k++)
          current[i][j][k]=0.0;
-       }
 
    return current;
 }
