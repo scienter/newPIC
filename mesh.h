@@ -99,11 +99,7 @@ typedef struct _Domain
    
    //sharing mesh
    double *XplusJ,*XminusJ,*YplusJ,*YminusJ,*ZplusJ,*ZminusJ;
-   double *minusYC,*plusYC,*minusZC,*plusZC;
-   double *minusY,*plusY,*minusZ,*plusZ;
    double *minusDenY,*plusDenY,*minusDenZ,*plusDenZ;
-   int numPlusYC,numMinusYC,numPlusZC,numMinusZC;
-   int numPlusY,numMinusY,numPlusZ,numMinusZ;
    int numPlusXJ,numMinusXJ,numPlusYJ,numMinusYJ,numPlusZJ,numMinusZJ;
    int numPlusDenY,numMinusDenY,numPlusDenZ,numMinusDenZ;
 

@@ -150,24 +150,6 @@ void boundary(Domain *D,External *Ext)
 
      MPI_Barrier(MPI_COMM_WORLD);
 
-    //Share Field
-    switch((D->fieldType-1)*3+D->dimension) {
-    case (Pukhov-1)*3+2:
-      //first 3 is 3 field variables, 2nd 1 is k, 3rd 2 or 3 is layer.
-      D->numPlusY=3*nxSub1D*1*2;
-      D->plusY = (double *)malloc(D->numPlusY*sizeof(double ));
-      D->numMinusY=3*nxSub1D*1*3;
-      D->minusY = (double *)malloc(D->numMinusY*sizeof(double ));
-      break;
-    case (Yee-1)*3+2:
-      //first 4 is 4 field variables, 2nd 1 is k, 3rd 2 or 3 is layer.
-      D->numPlusY=3*nxSub1D*1*2;
-      D->plusY = (double *)malloc(D->numPlusY*sizeof(double ));
-      D->numMinusY=3*nxSub1D*1*3;
-      D->minusY = (double *)malloc(D->numMinusY*sizeof(double ));
-      break;
-    }    
-
     // current J trasffering boundary
     switch(D->dimension)  {
     case 1 :

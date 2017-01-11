@@ -1,3 +1,6 @@
+#define DEFAULT		0
+#define ADDITION	1
+
 typedef struct _LaserList  {
    int polarity;
    int mode;

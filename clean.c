@@ -33,8 +33,6 @@ void cleanMemory(Domain *D)
       free(D->XminusJ);
       break;
     case (Pukhov-1)*3+2:
-      free(D->plusY);
-      free(D->minusY);
       free(D->XplusJ);
       free(D->XminusJ);
       free(D->YplusJ);

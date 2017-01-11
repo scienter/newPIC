@@ -18,12 +18,16 @@ void fieldSolve(Domain D,double t)
 {
   LaserList *L;
   int myrank, nTasks,rank,rankM,rankN;
+  void MPI_Transfer2F_Xminus();
+  void MPI_Transfer2F_Xplus();
   void MPI_Transfer3F_Xminus();
   void MPI_Transfer3F_Xplus();
   void MPI_Transfer6F_Xminus();
   void MPI_Transfer6F_Xplus();
-  void MPI_TransferF_Pukhov_Yminus();
-  void MPI_TransferF_Pukhov_Yplus();
+  void MPI_Transfer3F_Yminus();
+  void MPI_Transfer3F_Yplus();
+  void MPI_Transfer6F_Yminus();
+  void MPI_Transfer6F_Yplus();
 
   MPI_Status status;
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
@@ -123,8 +127,8 @@ void fieldSolve(Domain D,double t)
       MPI_Transfer3F_Xplus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
-      MPI_TransferF_Pukhov_Yminus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
-      MPI_TransferF_Pukhov_Yplus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
+      MPI_Transfer3F_Yminus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
+      MPI_Transfer3F_Yplus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
     } else	;
 
     //load laser
@@ -144,8 +148,8 @@ void fieldSolve(Domain D,double t)
       MPI_Transfer3F_Xplus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
-      MPI_TransferF_Pukhov_Yminus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
-      MPI_TransferF_Pukhov_Yplus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
+      MPI_Transfer3F_Yminus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
+      MPI_Transfer3F_Yplus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
     } else	;
     break;
 
@@ -157,8 +161,8 @@ void fieldSolve(Domain D,double t)
       MPI_Transfer3F_Xplus(&D,D.Ex,D.Ey,D.Ez,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
-      MPI_TransferF_Pukhov_Yminus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
-      MPI_TransferF_Pukhov_Yplus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
+      MPI_Transfer3F_Yminus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
+      MPI_Transfer3F_Yplus(&D,D.Ex,D.Ey,D.Ez,D.nxSub+5,1,3);
     } else	;
 
     //load laser
@@ -174,12 +178,12 @@ void fieldSolve(Domain D,double t)
 
     Bsolve2D_Pukhov(&D);
     if(D.L>1)  {
-      MPI_Transfer3F_Xminus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
-      MPI_Transfer3F_Xplus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
+      MPI_Transfer6F_Xminus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nySub+5,1,3);
+      MPI_Transfer6F_Xplus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
-      MPI_TransferF_Pukhov_Yminus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
-      MPI_TransferF_Pukhov_Yplus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
+      MPI_Transfer6F_Yminus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nxSub+5,1,3);
+      MPI_Transfer6F_Yplus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nxSub+5,1,3);
     } else	;
     break;
 
@@ -449,7 +453,7 @@ void Esolve2D_Yee(Domain *D)
       }
 }
 
-void solveField2DC_DSX(Domain *D)
+void solve2DC_Split(Domain *D)
 {
     int i,j,k,istart,iend,jstart,jend,kstart,kend,nxSub,nySub,nzSub;  
     double dx,dy,dz,dt,minXSub,minYSub,y;
@@ -515,7 +519,7 @@ void solveField2DC_DSX(Domain *D)
       }	
 }
 
-void solveField2D_DSX(Domain *D)
+void solve2D_Split(Domain *D)
 {
     int i,j,k,istart,iend,jstart,jend,kstart,kend,nxSub,nySub,nzSub;  
     double dx,dy,dz,dt,minXSub,minYSub,y;

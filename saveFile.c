@@ -565,153 +565,100 @@ void boostSaveField(Domain *D,int labSaveStep)
 
 void saveCenterField(Domain *D,int iteration)
 {
-   int i,j,k,n,istart,iend,jstart,jend,kstart,kend;
-   int minXSub,minXDomain,nx,number,index;
-   int rankX,targetCore,fromCore;
-   char name[100];
-   double x,Ex,Ey,Ez,Bx,By,Bz,factor,*field,*share;
-   FILE *out;
    int myrank;    
    MPI_Status status;
-
+   void calculationCenter();
    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-   istart=D->istart;
-   iend=D->iend;
-   jstart=D->jstart;
-   jend=D->jend;
-   kstart=D->kstart;
-   kend=D->kend;
-   nx=D->nx;
-   minXSub=D->minXSub;
-   minXDomain=D->minXDomain;
-
-   factor=D->gamma*(1+D->beta);
-   number=6*nx;
-   field=(double *)malloc(number*sizeof(double ));
-   share=(double *)malloc(number*sizeof(double ));
-   for(i=0; i<number; i++)  {
-     share[i]=0.0;
-     field[i]=0.0;
-   }
-
    switch((D->fieldType-1)*3+D->dimension) {
-   case (Split-1)*3+1:
+   case (Split-1)*3+2:
+     calculationCenter(D,D->Ex,D->Pr,D->Pl,D->Bx,D->Sr,D->Sl,"Split",iteration);
      break;
    case (Pukhov-1)*3+2:          
-     if(D->minYSub<=0 && 0<D->maxYSub)
-     {
-       targetCore=myrank%D->M;
-       rankX=myrank/(D->M*D->N);
-
-       k=0;
-       j=2-D->minYSub;
-       for(i=istart; i<iend; i++)  {
-         index=i-istart+minXSub-minXDomain;
-         share[nx*0+index]=D->Ex[i][j][k];    
-         share[nx*1+index]=D->Ey[i][j][k];    
-         share[nx*2+index]=D->Ez[i][j][k];    
-         share[nx*3+index]=D->Bx[i][j][k];    
-         share[nx*4+index]=D->By[i][j][k];    
-         share[nx*5+index]=D->Bz[i][j][k];    
-         field[nx*0+index]=share[nx*0+index];    
-         field[nx*1+index]=share[nx*1+index];    
-         field[nx*2+index]=share[nx*2+index];    
-         field[nx*3+index]=share[nx*3+index];    
-         field[nx*4+index]=share[nx*4+index];    
-         field[nx*5+index]=share[nx*5+index];    
-       }
-
-       for(n=1; n<D->L; n++)  {
-         fromCore=targetCore+n*D->M;
-         if(myrank==fromCore)
-           MPI_Send(share,number,MPI_DOUBLE,targetCore,myrank,MPI_COMM_WORLD);
-         else	;
-       } 
-
-       if(myrank==targetCore)       {
-         for(n=1; n<D->L; n++)  {
-           fromCore=targetCore+n*D->M;
-           MPI_Recv(share,number,MPI_DOUBLE,fromCore,fromCore,MPI_COMM_WORLD,&status);
-           for(i=0; i<number; i++)
-             field[i]+=share[i];    
-         }
-       } else	;  //End of if(myrank=targetCore)
-
-       if(myrank==targetCore)       {
-         sprintf(name,"cenField%d_%d",iteration,myrank);
-         out = fopen(name,"w");
-         for(i=0; i<nx; i++)  {
-           x=(i+minXDomain)*D->dx*D->lambda;
-           Ex=field[nx*0+i];
-           Ey=field[nx*1+i];
-           Ez=field[nx*2+i];
-           Bx=field[nx*3+i];
-           By=field[nx*4+i];
-           Bz=field[nx*5+i];
-           fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Ey,Ez,Bx,By,Bz);
-         }
-         fclose(out);
-       }	else	;
-
-     }   else	;  //End of minYSub<0<maxYSub
-
+     calculationCenter(D,D->Ex,D->Ey,D->Ez,D->Bx,D->By,D->Bz,"Pukhov",iteration);
      break;
-/*
-   case (Split-1)*3+3:
-      if(D->minYSub<=0 && D->maxYSub>0 && D->minZSub<=0 && D->maxZSub>0)
-      {
-        sprintf(name,"cenField%d_%d",iteration,myrank);
-        out = fopen(name,"w");
-
-	j=2-D->minYSub;
-	k=2-D->minZSub;
-        for(i=istart; i<iend; i++)
-        {
-          x=(i-2+D->minXSub)*D->dx*D->lambda;
-          y=(j-2+D->minYSub)*D->dy*D->lambda;
-          z=(k-2+D->minZSub)*D->dz*D->lambda;
-          Ex=D->Ex[i][j][k];    
-          Ey=D->Pr[i][j][k]+D->Pl[i][j][k];
-          Ez=D->Sr[i][j][k]+D->Sl[i][j][k];
-          Bx=D->Bx[i][j][k];    
-          By=D->Sl[i][j][k]-D->Sr[i][j][k];
-          Bz=D->Pr[i][j][k]-D->Pl[i][j][k];
-          fprintf(out,"%g %g %g %g %g %g %g %g %g\n",x,y,z,Ex,Ey,Ez,Bx,By,Bz);
-        }
-        fclose(out);
-      }
-      break;
-    case (Yee-1)*3+2 :
-      k=0;
-      i=(int)(0.5*(istart+iend-1));
-//      for(i=istart; i<iend; i++)
-//      {
-        for(j=jstart; j<jend; j++)
-        {
-          x=(i-2+D->minXSub)*D->dx*D->lambda;
-          y=(j-2+D->minYSub)*D->dy*D->lambda;
-          Ex=D->Ex[i][j][k];    
-          Ey=D->Ey[i][j][k];
-          Ez=D->Ez[i][j][k];
-          Bx=D->Bx[i][j][k];    
-          By=D->By[i][j][k];    
-          Bz=D->Bz[i][j][k];    
-          fprintf(out,"%g %g %g %g %g %g %g %g\n",x,y,Ex,Ey,Ez,Bx,By,Bz);
-        }
-        fprintf(out,"\n");                 
-//      }
-      fclose(out);
-      break;
-*/
-    default :
-      printf("what field_type? and what dimension?\n");
-    }
-
-    free(share);
-    free(field);
+   default :
+     printf("what field_type? and what dimension?\n");
+   }
 }
 
+void calculationCenter(Domain *D,double ***f1,double ***f2,double ***f3,double ***f4,double ***f5,double ***f6,char *fieldType,int iteration)
+{
+  int i,j,k,n,rankX,targetCore,fromCore,index,nx,minXSub,minXDomain;
+  char name[100];
+  double x,Ex,Ey,Ez,Bx,By,Bz,factor,*field,*share;
+  FILE *out;
+  int myrank,number,istart,iend,jstart,jend,kstart,kend;    
+  MPI_Status status;
+  MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+  istart=D->istart;   iend=D->iend;
+  jstart=D->jstart;   jend=D->jend;
+  kstart=D->kstart;   kend=D->kend;
+  nx=D->nx;   minXSub=D->minXSub;   minXDomain=D->minXDomain;
+
+  number=6*nx;
+  field=(double *)malloc(number*sizeof(double ));
+  share=(double *)malloc(number*sizeof(double ));
+  for(i=0; i<number; i++)  {
+     share[i]=0.0;     field[i]=0.0;
+  }
+
+  if(D->minYSub<=0 && 0<D->maxYSub)
+  {
+    targetCore=myrank%D->M;
+    rankX=myrank/(D->M*D->N);
+
+    if(D->dimension==2) {k=0;            j=2-D->minYSub;} else;
+    if(D->dimension==3) {k=2-D->minZSub; j=2-D->minYSub;} else;
+    for(i=istart; i<iend; i++)  {
+      index=i-istart+minXSub-minXDomain;
+      share[nx*0+index]=f1[i][j][k];    
+      share[nx*1+index]=f2[i][j][k];    
+      share[nx*2+index]=f3[i][j][k];    
+      share[nx*3+index]=f4[i][j][k];    
+      share[nx*4+index]=f5[i][j][k];    
+      share[nx*5+index]=f6[i][j][k];    
+      field[nx*0+index]=share[nx*0+index];    
+      field[nx*1+index]=share[nx*1+index];    
+      field[nx*2+index]=share[nx*2+index];    
+      field[nx*3+index]=share[nx*3+index];    
+      field[nx*4+index]=share[nx*4+index];    
+      field[nx*5+index]=share[nx*5+index];    
+    }
+
+    for(n=1; n<D->L; n++)  {
+      fromCore=targetCore+n*D->M;
+      if(myrank==fromCore)
+        MPI_Send(share,number,MPI_DOUBLE,targetCore,myrank,MPI_COMM_WORLD);
+      else	;
+    } 
+
+    if(myrank==targetCore)       {
+      for(n=1; n<D->L; n++)  {
+        fromCore=targetCore+n*D->M;
+        MPI_Recv(share,number,MPI_DOUBLE,fromCore,fromCore,MPI_COMM_WORLD,&status);
+        for(i=0; i<number; i++)
+          field[i]+=share[i];    
+      }
+    } else	;  //End of if(myrank=targetCore)
+
+    if(myrank==targetCore)       {
+      sprintf(name,"cen%s%d_%d",fieldType,iteration,myrank);
+      out = fopen(name,"w");
+      for(i=0; i<nx; i++)  {
+        x=(i+minXDomain)*D->dx*D->lambda;
+        Ex=field[nx*0+i]; Ey=field[nx*1+i]; Ez=field[nx*2+i];
+        Bx=field[nx*3+i]; By=field[nx*4+i]; Bz=field[nx*5+i];
+        fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Ey,Ez,Bx,By,Bz);
+      }
+      fclose(out);
+    }	else	;
+
+  }   else	;  //End of minYSub<0<maxYSub
+  free(share);
+  free(field);
+}
 
 void saveField(Domain *D,int iteration)
 {
@@ -722,12 +669,9 @@ void saveField(Domain *D,int iteration)
     int myrank, nprocs;    
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-    istart=D->istart;
-    iend=D->iend;
-    jstart=D->jstart;
-    jend=D->jend;
-    kstart=D->kstart;
-    kend=D->kend;
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
 
     sprintf(name,"field%d_%d",iteration,myrank);
     out = fopen(name,"w");
@@ -739,12 +683,8 @@ void saveField(Domain *D,int iteration)
       j=k=0;
       for(i=istart; i<iend; i++)      {
         x=(i-2+D->minXSub)*D->dx*D->lambda;
-        Ex=D->Ex[i][j][k];    
-        Pr=D->Pr[i][j][k];
-        Pl=D->Sr[i][j][k];
-        Bx=0.0;    
-        Sr=D->Sl[i][j][k];
-        Sl=D->Pr[i][j][k];
+        Ex=D->Ex[i][j][k]; Pr=D->Pr[i][j][k]; Pl=D->Sr[i][j][k];
+        Bx=0.0;            Sr=D->Sl[i][j][k]; Sl=D->Pr[i][j][k];
         fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Pr,Pl,Bx,Sr,Sl);
       }
       fclose(out);
@@ -752,24 +692,19 @@ void saveField(Domain *D,int iteration)
 
     case (Split-1)*3+2:
       k=0;
-      for(i=istart; i<iend; i++)
-      {
-        for(j=jstart; j<jend; j++)
-        {
+      for(i=istart; i<iend; i++)    {
+        for(j=jstart; j<jend; j++)        {
           x=(i-2+D->minXSub)*D->dx*D->lambda;
           y=(j-2+D->minYSub)*D->dy*D->lambda;
-//          Ex=D->Ex[i][j][k];    
-//          Ey=D->Pr[i][j][k]+D->Pl[i][j][k];
-//          Ez=D->Sr[i][j][k]+D->Sl[i][j][k];
-//          Bx=D->Bx[i][j][k];    
-//          By=D->Sl[i][j][k]-D->Sr[i][j][k];
-//          Bz=D->Pr[i][j][k]-D->Pl[i][j][k];
-//          fprintf(out,"%g %g %g %g %g %g %g %g\n",x,y,Ex,Ey,Ez,Bx,By,Bz);
+          Ex=D->Ex[i][j][k]; Pr=D->Pr[i][j][k]; Pl=D->Pl[i][j][k];
+          Bx=D->Bx[i][j][k]; Sr=D->Sr[i][j][k]; Sl=D->Sl[i][j][k];
+          fprintf(out,"%g %g %g %g %g %g %g %g\n",x,y,Ex,Pr,Pl,Bx,Sr,Sl);
         }
         fprintf(out,"\n");                 
       }
       fclose(out);
       break;
+
     case (Split-1)*3+3:
 //      k=(int)((kstart+kend)*0.5);
 //      j=(int)((jstart+jend)*0.5);
