@@ -136,7 +136,7 @@ void saveParticleHDF(Domain *D,int iteration,int s,double minPx)
       free(data);
     }	else	; 	//End of totalCnt>0
     MPI_Barrier(MPI_COMM_WORLD);
-
+/*
     //write meta
     a_dims=1;
     as_id=H5Screate_simple(1,&a_dims,NULL);
@@ -146,12 +146,17 @@ void saveParticleHDF(Domain *D,int iteration,int s,double minPx)
     H5Awrite(attr_id,H5T_NATIVE_INT,&totalCnt);
     H5Aclose(attr_id);
     H5Sclose(as_id);
-
+*/
     H5Dclose(dset_id);
 
     H5Sclose(filespace);
 
     free(recv);
     H5Fclose(file_id);
+
+    if(myrank==0)
+      saveIntMeta(name,"totalCnt",&totalCnt,1);
+    else        ;
+
 }
 

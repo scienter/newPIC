@@ -571,6 +571,8 @@ void saveCenterField(Domain *D,int iteration)
    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
    switch((D->fieldType-1)*3+D->dimension) {
+   case (Split-1)*3+1:
+     break;
    case (Split-1)*3+2:
      calculationCenter(D,D->Ex,D->Pr,D->Pl,D->Bx,D->Sr,D->Sl,"Split",iteration);
      break;

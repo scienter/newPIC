@@ -298,7 +298,7 @@ void saveJDump(Domain D,int iteration);
 void saveDumpParticleHDF(Domain *D,int iteration);
 void saveDumpParticleResolHDF(Domain *D,int iteration);
 void saveDumpDensityResolHDF(Domain D,int iteration);
-void saveDenParticleHDF(Domain *D,int iteration);
+void saveP_GridHDF(Domain D,int iteration);
 void saveFile(Domain D,int iteration);
 void firstFieldShare(Domain D);
 void secondFieldShare(Domain D);

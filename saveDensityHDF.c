@@ -21,10 +21,169 @@ void saveCoordHDF(Domain *D,char *fileName);
 void density_xdmf(int dimension,char *fileName,int nx,int ny,int nz,int s);
 void setZero(double ***den,int nx, int ny, int nz);
 void deleteField(double ***field,int nx,int ny,int nz);
+void save1D_P_Grid_HDF(Domain *D,int iteration);
 
+void saveP_GridHDF(Domain D,int iteration)
+{
+   switch (D.dimension) {
+   case 1 :
+     save1D_P_Grid_HDF(&D,iteration);     
+     break;
+   default :
+     printf("In saveP_GridHDF, what dimension?\n");
+   }
+}
 
+void save1D_P_Grid_HDF(Domain *D,int iteration)
+{
+    int i,j,k,s,istart,iend,jstart,jend,kstart,kend,nx,ny,nz;
+    int nxSub,nySub,nzSub,nxSub1D,nySub2D,nzSub3D;
+    int rankX,rankY,rankZ,biasX,biasY,biasZ;
+    double x,y,z,px,py,pz,xwl,xwr,ywl,ywr,weight;
+    double ***den1,***den2;
+    int offset[3];
+    char dataName[100],fileName[100];
+    LoadList *LL;
+    Particle ***particle;
+    particle=D->particle;
+    ptclList *p;
 
-void saveDenParticleHDF(Domain *D,int iteration)
+    int myrank, nTasks;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+    MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+
+    hid_t file_id,group_id,dset_id,filespace;
+    herr_t status;
+    rankX=myrank/(D->M*D->N);
+    rankZ=(myrank%(D->M*D->N))/D->M;
+    rankY=(myrank%(D->M*D->N))%D->M;
+
+    nxSub=D->nxSub;  nySub=D->nySub;  nzSub=D->nzSub;  
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend; j=0; 
+    kstart=D->kstart;    kend=D->kend; k=0;
+    nxSub1D=D->nxSub+5;    nySub2D=1;    nzSub3D=1;
+
+    LL=D->loadList;
+    s=0; while(LL->next) { LL=LL->next; s++; }
+    int numberInCell[s];
+    LL=D->loadList;
+    s=0; while(LL->next) { numberInCell[s]=LL->numberInCell; LL=LL->next; s++;}
+
+    //save denParticle
+    sprintf(fileName,"PGrid%d.h5",iteration);
+    if(myrank==0)     {
+      file_id=H5Fcreate(fileName,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
+      H5Fclose(file_id);
+    }    else        ;
+    MPI_Barrier(MPI_COMM_WORLD);
+    if(myrank==0)  {
+        saveIntMeta(fileName,"/nx",&D->nx,1);
+        saveIntMeta(fileName,"/ny",&D->ny,1);
+        saveIntMeta(fileName,"/nz",&D->nz,1);
+        saveIntMeta(fileName,"/minXDomain",&D->minXDomain,1);
+        saveIntMeta(fileName,"/minYDomain",&D->minYDomain,1);
+        saveIntMeta(fileName,"/minZDomain",&D->minZDomain,1);
+        saveIntMeta(fileName,"/nSpecies",&D->nSpecies,1);
+    } else      ;
+    MPI_Barrier(MPI_COMM_WORLD);
+
+    den1=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+    den2=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+    nx=D->nx+5; ny=1; nz=1;
+    calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
+
+    offset[0]=D->minXSub-D->minXDomain+biasX;
+    offset[1]=0; offset[2]=0;
+
+    for(s=0; s<D->nSpecies; s++)
+    {
+      if(myrank==0)    {
+        file_id=H5Fopen(fileName,H5F_ACC_RDWR,H5P_DEFAULT);
+        sprintf(dataName,"%d",s);
+        group_id=H5Gcreate2(file_id,dataName,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
+        H5Gclose(group_id);
+        H5Fclose(file_id);
+      }  else         ;
+      MPI_Barrier(MPI_COMM_WORLD);
+
+      setZero(den1,nxSub1D,nySub2D,nzSub3D);
+      setZero(den2,nxSub1D,nySub2D,nzSub3D);
+      for(i=D->istart; i<D->iend; i++)    {
+        p=particle[i][j][k].head[s]->pt;
+        while(p)            {
+          px=p->weight*p->p1;
+          xwl=1.0-p->x;  xwr=1.0-xwl;
+          den1[i][j][k]+=xwl*px; den2[i][j][k]+=xwr*px;
+          p=p->next;
+        }
+      }
+      sprintf(dataName,"%d/px1",s);
+      saveFieldComp(den1,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      sprintf(dataName,"%d/px2",s);
+      saveFieldComp(den2,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+
+      setZero(den1,nxSub1D,nySub2D,nzSub3D);
+      setZero(den2,nxSub1D,nySub2D,nzSub3D);
+      for(i=D->istart; i<D->iend; i++)     {
+        p=particle[i][j][k].head[s]->pt;
+        while(p)            {
+          px=p->weight*p->p2;
+          xwl=1.0-p->x;  xwr=1.0-xwl;
+          den1[i][j][k]+=xwl*px;
+          den2[i][j][k]+=xwr*px;
+          p=p->next;
+        }
+      }
+      sprintf(dataName,"%d/py1",s);
+      saveFieldComp(den1,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      sprintf(dataName,"%d/py2",s);
+      saveFieldComp(den2,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+
+      setZero(den1,nxSub1D,nySub2D,nzSub3D);
+      setZero(den2,nxSub1D,nySub2D,nzSub3D);
+      for(i=D->istart; i<D->iend; i++) {
+        p=particle[i][j][k].head[s]->pt;
+        while(p)            {
+          px=p->weight*p->p3;
+          xwl=1.0-p->x;  xwr=1.0-xwl;
+          den1[i][j][k]+=xwl*px;
+          den2[i][j][k]+=xwr*px;
+          p=p->next;
+        }
+      }
+      sprintf(dataName,"%d/pz1",s);
+      saveFieldComp(den1,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      sprintf(dataName,"%d/pz2",s);
+      saveFieldComp(den2,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+
+      //save density
+      setZero(den1,nxSub1D,nySub2D,nzSub3D);
+      setZero(den2,nxSub1D,nySub2D,nzSub3D);
+      for(i=D->istart; i<D->iend; i++)    {
+        p=particle[i][j][k].head[s]->pt;
+        while(p)            {
+          weight=p->weight;
+          xwl=1.0-p->x;  xwr=1.0-xwl;
+          den1[i][j][k]+=xwl*weight;
+          den2[i][j][k]+=xwr*weight;
+          p=p->next;
+        }
+      }
+      sprintf(dataName,"%d/q1",s);
+      saveFieldComp(den1,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      sprintf(dataName,"%d/q2",s);
+      saveFieldComp(den2,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+    }
+
+    deleteField(den1,nxSub1D,nySub2D,nzSub3D);
+    deleteField(den2,nxSub1D,nySub2D,nzSub3D);
+
+    if(myrank==0)  printf("%s\n",fileName);  else;
+}
+
+/*
+void save2D_P_Grid_HDF(Domain *D,int iteration)
 {
     int i,j,k,s,istart,iend,jstart,jend,kstart,kend,nx,ny,nz;
     int nxSub,nySub,nzSub,nxSub1D,nySub2D,nzSub3D;
@@ -44,18 +203,8 @@ void saveDenParticleHDF(Domain *D,int iteration)
     hid_t file_id,group_id,dset_id,filespace;
     herr_t status;
 
-    nxSub=D->nxSub;
-    nySub=D->nySub;
-    nzSub=D->nzSub;
-    istart=D->istart;
-    iend=D->iend;
-    jstart=D->jstart;
-    jend=D->jend;
-    kstart=D->kstart;
-    kend=D->kend;
-    nx=D->nx;
-    ny=D->ny;
-    nz=D->nz;
+    nxSub=D->nxSub;      nx=D->nx;
+    istart=D->istart;    iend=D->iend;
 
     nxSub1D=D->nxSub+5;
     nySub2D=1;
@@ -272,6 +421,7 @@ void saveDenParticleHDF(Domain *D,int iteration)
       break;
     }   //End of switch (dimension)
 }
+*/
 
 //lala
 void saveDensityHDF(Domain *D,int iteration)
@@ -407,11 +557,7 @@ void solveDensity1D(Domain *D,int s,double coef)
       while(p)
       {
         weight=p->weight;
-        x=p->x;
-        x1=1+x;
-        x2=x;
-        x3=1-x;
-        x4=2-x;
+        x=p->x; x1=1+x; x2=x; x3=1-x; x4=2-x;
         Wx[0]=(2-x1)*(2-x1)*(2-x1)/6.0;
         Wx[1]=(4-6*x2*x2+3*x2*x2*x2)/6.0;
         Wx[2]=(4-6*x3*x3+3*x3*x3*x3)/6.0;
@@ -449,20 +595,12 @@ void solveDensity2D(Domain *D,int s,double coef)
       while(p)
       {
         weight=p->weight;
-        x=p->x;
-        x1=1+x;
-        x2=x;
-        x3=1-x;
-        x4=2-x;
+        x=p->x; x1=1+x; x2=x; x3=1-x; x4=2-x;
         Wx[0]=(2-x1)*(2-x1)*(2-x1)/6.0;
         Wx[1]=(4-6*x2*x2+3*x2*x2*x2)/6.0;
         Wx[2]=(4-6*x3*x3+3*x3*x3*x3)/6.0;
         Wx[3]=(2-x4)*(2-x4)*(2-x4)/6.0;
-        y=p->y;
-        y1=1+y;
-        y2=y;
-        y3=1-y;
-        y4=2-y;
+        y=p->y; y1=1+y; y2=y; y3=1-y; y4=2-y;
         Wy[0]=(2-y1)*(2-y1)*(2-y1)/6.0;
         Wy[1]=(4-6*y2*y2+3*y2*y2*y2)/6.0;
         Wy[2]=(4-6*y3*y3+3*y3*y3*y3)/6.0;
@@ -504,29 +642,17 @@ void solveDensity3D(Domain *D,int s,double coef)
         while(p)
         {
           weight=p->weight;
-          x=p->x;
-          x1=1+x;
-          x2=x;
-          x3=1-x;
-          x4=2-x;
+          x=p->x; x1=1+x; x2=x; x3=1-x; x4=2-x;
           Wx[0]=(2-x1)*(2-x1)*(2-x1)/6.0;
           Wx[1]=(4-6*x2*x2+3*x2*x2*x2)/6.0;
           Wx[2]=(4-6*x3*x3+3*x3*x3*x3)/6.0;
           Wx[3]=(2-x4)*(2-x4)*(2-x4)/6.0;
-          y=p->y;
-          y1=1+y;
-          y2=y;
-          y3=1-y;
-          y4=2-y;
+          y=p->y; y1=1+y; y2=y; y3=1-y; y4=2-y;
           Wy[0]=(2-y1)*(2-y1)*(2-y1)/6.0;
           Wy[1]=(4-6*y2*y2+3*y2*y2*y2)/6.0;
           Wy[2]=(4-6*y3*y3+3*y3*y3*y3)/6.0;
           Wy[3]=(2-y4)*(2-y4)*(2-y4)/6.0;
-          z=p->z;
-          z1=1+z;
-          z2=z;
-          z3=1-z;
-          z4=2-z;
+          z=p->z; z1=1+z; z2=z; z3=1-z; z4=2-z;
           Wz[0]=(2-z1)*(2-z1)*(2-z1)/6.0;
           Wz[1]=(4-6*z2*z2+3*z2*z2*z2)/6.0;
           Wz[2]=(4-6*z3*z3+3*z3*z3*z3)/6.0;
@@ -555,9 +681,7 @@ void saveCoordHDF(Domain *D,char *fileName)
   hsize_t dimy[1],dimx[1],dimz[1];
   const char *coorName[] = {"/Y","/X","/Z"};
 
-  nx=D->nx;
-  ny=D->ny;
-  nz=D->nz;
+  nx=D->nx;  ny=D->ny;  nz=D->nz;
 
   if(myrank==0)
   {
@@ -583,20 +707,15 @@ void saveCoordHDF(Domain *D,char *fileName)
 
     //2D
     case 2:
-      dimx[0]=nx;
-      dimy[0]=ny;
+      dimx[0]=nx;      dimy[0]=ny;
       xtic=(double *)malloc(nx*sizeof(double));
-      for(i=0;i<nx;i++)
-        xtic[i]=(i+D->minXDomain)*D->lambda*D->dx;
+      for(i=0;i<nx;i++) xtic[i]=(i+D->minXDomain)*D->lambda*D->dx;
       ytic=(double *)malloc(ny*sizeof(double));
-      for(i=0;i<ny;i++)
-        ytic[i]=(i+D->minYDomain)*D->lambda*D->dy;
+      for(i=0;i<ny;i++) ytic[i]=(i+D->minYDomain)*D->lambda*D->dy;
       for(ii=0; ii<2; ii++)
       {
-        if(ii==0)
-          filespace=H5Screate_simple(1,dimy,NULL);
-        else if(ii==1)
-          filespace=H5Screate_simple(1,dimx,NULL);
+        if(ii==0) filespace=H5Screate_simple(1,dimy,NULL);
+        else if(ii==1) filespace=H5Screate_simple(1,dimx,NULL);
         dset_id=H5Dcreate2(file_id,coorName[ii],H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
         status = H5Dwrite(dset_id, H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,ii==0 ? ytic : xtic);
         H5Dclose(dset_id);
@@ -608,18 +727,13 @@ void saveCoordHDF(Domain *D,char *fileName)
 
     //3D
     case 3:
-      dimx[0]=nx;
-      dimy[0]=ny;
-      dimz[0]=nz;
+      dimx[0]=nx;      dimy[0]=ny;      dimz[0]=nz;
       xtic=(double *)malloc(nx*sizeof(double));
-      for(i=0;i<nx;i++)
-        xtic[i]=(i+D->minXDomain)*D->lambda*D->dx;
+      for(i=0;i<nx;i++) xtic[i]=(i+D->minXDomain)*D->lambda*D->dx;
       ytic=(double *)malloc(ny*sizeof(double));
-      for(i=0;i<ny;i++)
-        ytic[i]=(i+D->minYDomain)*D->lambda*D->dy;
+      for(i=0;i<ny;i++) ytic[i]=(i+D->minYDomain)*D->lambda*D->dy;
       ztic=(double *)malloc(nz*sizeof(double));
-      for(i=0;i<nz;i++)
-        ztic[i]=(i+D->minZDomain)*D->lambda*D->dz;
+      for(i=0;i<nz;i++) ztic[i]=(i+D->minZDomain)*D->lambda*D->dz;
       filespace=H5Screate_simple(1,dimy,NULL);
       dset_id=H5Dcreate2(file_id,"/Y",H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
       status = H5Dwrite(dset_id, H5T_NATIVE_DOUBLE,H5S_ALL,H5S_ALL,H5P_DEFAULT,ytic);

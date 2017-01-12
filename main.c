@@ -103,37 +103,24 @@ int main(int argc, char *argv[])
 //       else	;
 
        //resolChange
-       if(D.resolChange==ON && D.resolHigh==ON)  {
+       if(D.resolChange==ON)  {
          if(iteration==D.resolStep)   {
              saveBDump(D,iteration);
              saveEDump(D,iteration);
              saveJDump(D,iteration);
-             saveDenParticleHDF(&D,iteration);
+             saveP_GridHDF(D,iteration);
          } else	;
          if(iteration+1==D.resolStep)   {
              saveBDump(D,iteration);
              saveJDump(D,iteration);
-             saveDenParticleHDF(&D,iteration);
+             saveP_GridHDF(D,iteration);
          } else	;
          if(iteration-1==D.resolStep)   {
              saveBDump(D,iteration);
              saveJDump(D,iteration);
-             saveDenParticleHDF(&D,iteration);
+             saveP_GridHDF(D,iteration);
          } else	;
-       }  else if(D.resolChange==ON && D.resolLow==ON)  {
-         if(iteration==D.resolStep)   {
-             saveEDump(D,iteration);
-         } else	;
-         if(iteration-D.resolX/2==D.resolStep)   {
-             saveBDump(D,iteration);
-             saveJDump(D,iteration);
-         } else	;
-         if(iteration-D.resolX/2+1==D.resolStep)   {
-             saveBDump(D,iteration);
-             saveJDump(D,iteration);
-//             saveDumpParticleResolHDF(&D,iteration);
-         } else	;
-       }       
+       }      else; 
 
        //save File      
        if(iteration%D.saveStep==0 && iteration>=D.saveStart)   {
