@@ -343,9 +343,9 @@ void loadMovingPolygonPlasma2D(Domain *D,LoadList *LL,int s,int iteration)
              cnt=0;
              while(cnt<intNum)
              {               
-               positionX=randomValue(1.0);
-               positionY=randomValue(1.0);
-//               random2D_sobol(&positionX,&positionY,q);
+//               positionX=randomValue(1.0);
+//               positionY=randomValue(1.0);
+               random2D_sobol(&positionX,&positionY,q);
 
                New = (ptclList *)malloc(sizeof(ptclList)); 
                New->next = particle[i][j][k].head[s]->pt;

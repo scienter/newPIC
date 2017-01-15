@@ -18,8 +18,8 @@ void fieldSolve(Domain D,double t)
 {
   LaserList *L;
   int myrank, nTasks,rank,rankM,rankN;
-  void MPI_Transfer2F_Xminus();
-  void MPI_Transfer2F_Xplus();
+  void MPI_Transfer4F_Xminus();
+  void MPI_Transfer4F_Xplus();
   void MPI_Transfer3F_Xminus();
   void MPI_Transfer3F_Xplus();
   void MPI_Transfer6F_Xminus();
@@ -67,8 +67,8 @@ void fieldSolve(Domain D,double t)
     }
     solve2DC_Split(&D);
     if(D.L>1)  {
-      MPI_Transfer2F_Xminus(&D,D.PlC,D.SlC,D.nySub+5,1,3);
-      MPI_Transfer2F_Xplus(&D,D.ExC,D.BxC,D.nySub+5,1,3);
+      MPI_Transfer4F_Xminus(&D,D.ExC,D.BxC,D.PlC,D.SlC,D.nySub+5,1,3);
+      MPI_Transfer4F_Xplus(&D,D.ExC,D.BxC,D.PrC,D.SrC,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
       MPI_Transfer3F_Yminus(&D,D.SrC,D.SlC,D.ExC,D.nxSub+5,1,3);
@@ -84,6 +84,7 @@ void fieldSolve(Domain D,double t)
       MPI_Transfer6F_Yminus(&D,D.Ex,D.Pr,D.Pl,D.Bx,D.Sr,D.Sl,D.nxSub+5,1,3);
       MPI_Transfer6F_Yplus(&D,D.Ex,D.Pr,D.Pl,D.Bx,D.Sr,D.Sl,D.nxSub+5,1,3);
     } else	;
+
     break;
 
   //3D
@@ -452,6 +453,7 @@ void Esolve2D_Yee(Domain *D)
         D->Ez[i][j][k]+=dt/dx*(D->By[i][j][k]-D->By[i-1][j][k])-dt/dy*(D->Bx[i][j][k]-D->Bx[i][j-1][k])-2*pi*dt*D->Jz[i][j][k];
       }
 }
+//lala
 
 void solve2DC_Split(Domain *D)
 {
@@ -501,22 +503,27 @@ void solve2DC_Split(Domain *D)
         tmp=right2r*left2r*upr*btr*(-dt/dy*(D->Sr[i][j+1][k]-D->Sr[i][j][k]+D->Sl[i][j+1][k]-D->Sl[i][j][k]));
         D->BxC[i][j][k]=right1d*left1d*upd*btd*(D->BxC[i][j][k]+tmp);
 
-        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->Ex[i][j+1][k]+D->Ex[i-1][j+1][k]-D->Ex[i][j][k]-D->Ex[i-1][j][k])-0.5*pi*dt*(D->JyOld[i][j][k]+D->Jy[i][j][k]));
+        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->Ex[i+1][j+1][k]+D->Ex[i][j+1][k]-D->Ex[i+1][j][k]-D->Ex[i][j][k])-0.5*pi*dt*(D->JyOld[i+1][j][k]+D->Jy[i+1][j][k]));
         D->PlC[i][j][k]=right2r*left2r*upd*btd*(D->PlC[i+1][j][k]+tmp);
 
-        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->Bx[i][j][k]+D->Bx[i-1][j][k]-D->Bx[i][j-1][k]-D->Bx[i-1][j-1][k])-0.5*pi*dt*(D->JzOld[i][j][k]+D->Jz[i][j][k]));
+        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->Bx[i+1][j][k]+D->Bx[i][j][k]-D->Bx[i+1][j-1][k]-D->Bx[i][j-1][k])-0.5*pi*dt*(D->JzOld[i+1][j][k]+D->Jz[i+1][j][k]));
         D->SlC[i][j][k]=right2r*left2r*upd*btd*(D->SlC[i+1][j][k]+tmp);
       }	
 
     // PrC,SrC
-    for(i=iend-1; i>=istart; i++)
+    for(i=iend-1; i>=istart; i--)
       for(j=jstart; j<jend; j++)
       {
+        y=(j-jstart)+minYSub;
+        if(D->pmlOn==ON)
+          absorb2D_UD(D,&upr,&btr,&upd,&btd,y,upL,bottomL,LdU,LdB,rr,rd);
+        else    ;
         tmp=right2r*left2r*upr*btr*(0.25*dt/dy*(D->Ex[i][j+1][k]+D->Ex[i-1][j+1][k]-D->Ex[i][j][k]-D->Ex[i-1][j][k])-0.5*pi*dt*(D->JyOld[i][j][k]+D->Jy[i][j][k]));
         D->PrC[i][j][k]=right2r*left2r*upd*btd*(D->PrC[i-1][j][k]+tmp);
         tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->Bx[i][j][k]+D->Bx[i-1][j][k]-D->Bx[i][j-1][k]-D->Bx[i-1][j-1][k])-0.5*pi*dt*(D->JzOld[i][j][k]+D->Jz[i][j][k]));
         D->SrC[i][j][k]=right2r*left2r*upd*btd*(D->SrC[i-1][j][k]+tmp);
       }	
+
 }
 
 void solve2D_Split(Domain *D)
@@ -567,17 +574,21 @@ void solve2D_Split(Domain *D)
         tmp=right2r*left2r*upr*btr*(-dt/dy*(D->SrC[i][j+1][k]-D->SrC[i][j][k]+D->SlC[i][j+1][k]-D->SlC[i][j][k]));
         D->Bx[i][j][k]=right1d*left1d*upd*btd*(D->Bx[i][j][k]+tmp);
 
-        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->ExC[i][j+1][k]+D->ExC[i-1][j+1][k]-D->ExC[i][j][k]-D->ExC[i-1][j][k])-pi*dt*D->Jy[i][j][k]);
+        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->ExC[i+1][j+1][k]+D->ExC[i][j+1][k]-D->ExC[i+1][j][k]-D->ExC[i][j][k])-pi*dt*D->Jy[i+1][j][k]);
         D->Pl[i][j][k]=right2r*left2r*upd*btd*(D->Pl[i+1][j][k]+tmp);
 
-        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->BxC[i][j][k]+D->BxC[i-1][j][k]-D->BxC[i][j-1][k]-D->BxC[i-1][j-1][k])-pi*dt*D->Jz[i][j][k]);
+        tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->BxC[i+1][j][k]+D->BxC[i][j][k]-D->BxC[i+1][j-1][k]-D->BxC[i][j-1][k])-pi*dt*D->Jz[i+1][j][k]);
         D->Sl[i][j][k]=right2r*left2r*upd*btd*(D->Sl[i+1][j][k]+tmp);
       }	
 
     // Pr,Sr
-    for(i=iend-1; i>=istart; i++)
+    for(i=iend-1; i>=istart; i--)
       for(j=jstart; j<jend; j++)
       {
+        y=(j-jstart)+minYSub;
+        if(D->pmlOn==ON)
+          absorb2D_UD(D,&upr,&btr,&upd,&btd,y,upL,bottomL,LdU,LdB,rr,rd);
+        else    ;
         tmp=right2r*left2r*upr*btr*(0.25*dt/dy*(D->ExC[i][j+1][k]+D->ExC[i-1][j+1][k]-D->ExC[i][j][k]-D->ExC[i-1][j][k])-pi*dt*D->Jy[i][j][k]);
         D->Pr[i][j][k]=right2r*left2r*upd*btd*(D->Pr[i-1][j][k]+tmp);
         tmp=right2r*left2r*upr*btr*(-0.25*dt/dy*(D->BxC[i][j][k]+D->BxC[i-1][j][k]-D->BxC[i][j-1][k]-D->BxC[i-1][j-1][k])-pi*dt*D->Jz[i][j][k]);

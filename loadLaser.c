@@ -265,7 +265,9 @@ void loadLaser2D_Split(Domain *D,LaserList *L,double t)
          }
        }
        break;
-
+     default :
+       printf("In loadLaser.c, what laser mode?\n");
+       break;
      }		//End of switch
    }  else ;   	//End of field is OK
 }

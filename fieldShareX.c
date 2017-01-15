@@ -3,7 +3,7 @@
 #include "mesh.h"
 #include "mpi.h"
 
-void MPI_Transfer2F_Xminus(Domain *D,double ***f1,double ***f2,int ny,int nz,int share)
+void MPI_Transfer4F_Xminus(Domain *D,double ***f1,double ***f2,double ***f3,double ***f4,int ny,int nz,int share)
 {
     int i,j,k,num,start,end;
     int istart,iend,jstart,jend,kstart,kend;
@@ -21,7 +21,7 @@ void MPI_Transfer2F_Xminus(Domain *D,double ***f1,double ***f2,int ny,int nz,int
 
     rank=myrank/(D->M*D->N);
 
-    num=2*ny*nz*3;
+    num=4*ny*nz*3;
     data = (double *)malloc(num*sizeof(double ));
  
     //Transferring even ~ odd cores 
@@ -31,6 +31,8 @@ void MPI_Transfer2F_Xminus(Domain *D,double ***f1,double ***f2,int ny,int nz,int
       {
         for(k=0; k<nz; k++) data[start+k]=f1[i+istart][j][k]; start+=nz;
         for(k=0; k<nz; k++) data[start+k]=f2[i+istart][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f3[i+istart][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f4[i+istart][j][k]; start+=nz;
       }
 
     if(rank%2==0 && rank!=D->L-1)
@@ -41,6 +43,8 @@ void MPI_Transfer2F_Xminus(Domain *D,double ***f1,double ***f2,int ny,int nz,int
         for(j=0; j<ny; j++)	{
           for(k=0; k<nz; k++) f1[iend+i][j][k]=data[start+k]; start+=nz;
           for(k=0; k<nz; k++) f2[iend+i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f3[iend+i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f4[iend+i][j][k]=data[start+k]; start+=nz;
         }  
     }
     else if(rank%2==1)
@@ -53,6 +57,8 @@ void MPI_Transfer2F_Xminus(Domain *D,double ***f1,double ***f2,int ny,int nz,int
       for(j=0; j<ny; j++)	 {
         for(k=0; k<nz; k++) data[start+k]=f1[i+istart][j][k]; start+=nz;
         for(k=0; k<nz; k++) data[start+k]=f2[i+istart][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f3[i+istart][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f4[i+istart][j][k]; start+=nz;
       }
         
     if(rank%2==1 && rank!=D->L-1)
@@ -63,6 +69,8 @@ void MPI_Transfer2F_Xminus(Domain *D,double ***f1,double ***f2,int ny,int nz,int
         for(j=0; j<ny; j++)	{
           for(k=0; k<nz; k++) f1[iend+i][j][k]=data[start+k]; start+=nz;
           for(k=0; k<nz; k++) f2[iend+i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f3[iend+i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f4[iend+i][j][k]=data[start+k]; start+=nz;
         }  
     }
     else if(rank%2==0 && rank!=0)
@@ -226,7 +234,7 @@ void MPI_Transfer6F_Xminus(Domain *D,double ***f1,double ***f2,double ***f3,doub
     free(data);
 }
 
-void MPI_Transfer2F_Xplus(Domain *D,double ***f1,double ***f2,int ny,int nz,int share)
+void MPI_Transfer4F_Xplus(Domain *D,double ***f1,double ***f2,double ***f3,double ***f4,int ny,int nz,int share)
 {
     int i,j,k,num;
     int istart,iend,jstart,jend,kstart,kend;
@@ -244,7 +252,7 @@ void MPI_Transfer2F_Xplus(Domain *D,double ***f1,double ***f2,int ny,int nz,int 
 
     rank=myrank/(D->M*D->N);
 
-    num=2*ny*nz*2;
+    num=4*ny*nz*2;
     data = (double *)malloc(num*sizeof(double ));
 
     //Transferring even ~ odd cores 
@@ -253,6 +261,8 @@ void MPI_Transfer2F_Xplus(Domain *D,double ***f1,double ***f2,int ny,int nz,int 
       for(j=0; j<ny; j++)	{
         for(k=0; k<nz; k++) data[start+k]=f1[iend-i][j][k]; start+=nz;
         for(k=0; k<nz; k++) data[start+k]=f2[iend-i][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f3[iend-i][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f4[iend-i][j][k]; start+=nz;
       }
       
     if(rank%2==1)
@@ -263,6 +273,8 @@ void MPI_Transfer2F_Xplus(Domain *D,double ***f1,double ***f2,int ny,int nz,int 
         for(j=0; j<ny; j++)	{
           for(k=0; k<nz; k++) f1[istart-i][j][k]=data[start+k]; start+=nz;
           for(k=0; k<nz; k++) f2[istart-i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f3[istart-i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f4[istart-i][j][k]=data[start+k]; start+=nz;
         }
     }
     else if(rank%2==0 && rank!=D->L-1)
@@ -275,6 +287,8 @@ void MPI_Transfer2F_Xplus(Domain *D,double ***f1,double ***f2,int ny,int nz,int 
       for(j=0; j<ny; j++)      {
         for(k=0; k<nz; k++) data[start+k]=f1[iend-i][j][k]; start+=nz;
         for(k=0; k<nz; k++) data[start+k]=f2[iend-i][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f3[iend-i][j][k]; start+=nz;
+        for(k=0; k<nz; k++) data[start+k]=f4[iend-i][j][k]; start+=nz;
       }
         
     if(rank%2==0 && rank!=0)
@@ -285,6 +299,8 @@ void MPI_Transfer2F_Xplus(Domain *D,double ***f1,double ***f2,int ny,int nz,int 
         for(j=0; j<ny; j++)	{
           for(k=0; k<nz; k++) f1[istart-i][j][k]=data[start+k]; start+=nz;
           for(k=0; k<nz; k++) f2[istart-i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f3[istart-i][j][k]=data[start+k]; start+=nz;
+          for(k=0; k<nz; k++) f4[istart-i][j][k]=data[start+k]; start+=nz;
         }
     }
     else if(rank%2==1 && rank!=D->L-1)

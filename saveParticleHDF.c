@@ -7,6 +7,8 @@
 #include "hdf5.h"
 #include "hdf5_hl.h"
 
+void saveIntMeta(char *fileName,char *dataName,int *data,int dataCnt);
+
 void saveParticleHDF(Domain *D,int iteration,int s,double minPx)
 {
     int i,j,k,istart,iend,jstart,jend,kstart,kend;

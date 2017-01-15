@@ -36,11 +36,11 @@ void saveP_GridHDF(Domain D,int iteration)
 
 void save1D_P_Grid_HDF(Domain *D,int iteration)
 {
-    int i,j,k,s,istart,iend,jstart,jend,kstart,kend,nx,ny,nz;
-    int nxSub,nySub,nzSub,nxSub1D,nySub2D,nzSub3D;
+    int i,j,k,s,l,istart,iend,jstart,jend,kstart,kend,nx,ny,nz;
+    int nxSub,nySub,nzSub,nxSub1D,nySub2D,nzSub3D,cnt;
     int rankX,rankY,rankZ,biasX,biasY,biasZ;
-    double x,y,z,px,py,pz,xwl,xwr,ywl,ywr,weight;
-    double ***den1,***den2;
+    double x,y,z,px,py,pz,xwl,xwr,ywl,ywr,weight,tmpE,invCnt;
+    double ***den1,***den2,***den3,***den4,sum1[3],sum2[3];
     int offset[3];
     char dataName[100],fileName[100];
     LoadList *LL;
@@ -90,6 +90,8 @@ void save1D_P_Grid_HDF(Domain *D,int iteration)
 
     den1=memoryAsign(nxSub1D,nySub2D,nzSub3D);
     den2=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+    den3=memoryAsign(nxSub1D,nySub2D,nzSub3D);
+    den4=memoryAsign(nxSub1D,nySub2D,nzSub3D);
     nx=D->nx+5; ny=1; nz=1;
     calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
 
@@ -174,10 +176,52 @@ void save1D_P_Grid_HDF(Domain *D,int iteration)
       saveFieldComp(den1,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
       sprintf(dataName,"%d/q2",s);
       saveFieldComp(den2,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
-    }
+      //save sigX
+      setZero(den1,nxSub1D,nySub2D,nzSub3D);
+      setZero(den2,nxSub1D,nySub2D,nzSub3D);
+      setZero(den3,nxSub1D,nySub2D,nzSub3D);
+      setZero(den4,nxSub1D,nySub2D,nzSub3D);
+      for(i=D->istart; i<D->iend; i++)    {
+        for(l=0; l<3; l++) { sum1[l]=0.0;  sum2[l]=0.0; }
+        cnt=0;  tmpE=0.0;
+        p=particle[i][j][k].head[s]->pt;
+        while(p)            {
+          weight=p->weight;
+          px=p->p1; py=p->p2; pz=p->p3;
+          sum2[0]+=px*px;
+          sum2[1]+=py*py;
+          sum2[2]+=pz*pz;
+          sum1[0]+=px;
+          sum1[1]+=py;
+          sum1[2]+=pz;
+          tmpE+=sqrt(1.0+px*px+py*py+pz*pz)*weight;
+          p=p->next;  cnt++;
+        }
+        if(cnt>0)  {
+          invCnt=1.0/(double)cnt;
+          den1[i][j][k]=sqrt(sum2[0]*invCnt-sum1[0]*sum1[0]*invCnt*invCnt);
+          den2[i][j][k]=sqrt(sum2[1]*invCnt-sum1[1]*sum1[1]*invCnt*invCnt);
+          den3[i][j][k]=sqrt(sum2[2]*invCnt-sum1[2]*sum1[2]*invCnt*invCnt);
+          den4[i][j][k]=tmpE;
+        }  else  {
+          den4[i][j][k]=1.0;
+        }
+      }
+      sprintf(dataName,"%d/sigX",s);
+      saveFieldComp(den1,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      sprintf(dataName,"%d/sigY",s);
+      saveFieldComp(den2,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      sprintf(dataName,"%d/sigZ",s);
+      saveFieldComp(den3,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      sprintf(dataName,"%d/energy",s);
+      saveFieldComp(den4,fileName,dataName,nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+
+    }	//End of nSpecies
 
     deleteField(den1,nxSub1D,nySub2D,nzSub3D);
     deleteField(den2,nxSub1D,nySub2D,nzSub3D);
+    deleteField(den3,nxSub1D,nySub2D,nzSub3D);
+    deleteField(den4,nxSub1D,nySub2D,nzSub3D);
 
     if(myrank==0)  printf("%s\n",fileName);  else;
 }

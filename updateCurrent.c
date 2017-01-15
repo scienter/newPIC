@@ -45,6 +45,7 @@ void updateCurrent(Domain D)
   void MPI_TransferJ_Yminus();
   void MPI_Transfer3F_Xminus();
   void MPI_Transfer3F_Xplus();
+  void MPI_Transfer6F_Xminus();
 //  void MPI_TransferJ_Zplus();
 //  void MPI_TransferJ_Zminus();
   void removeBoostIon();
@@ -56,25 +57,14 @@ void updateCurrent(Domain D)
     nSpecies=1;    
 
   switch((D.currentType-1)*3+D.dimension)  {
-  case ((1-1)*3+1) :    
+  case ((FIRST-1)*3+1) :    
     updateCurrent1D_1st(&D,nSpecies);
     if(D.L>1)  {
       MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
       MPI_TransferJ_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
-      MPI_Transfer3F_Xplus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
-      MPI_Transfer3F_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
-    }  else	;
+    } else ;
     break;
-  case ((1-1)*3+2) :    
-/*
-    if(D->boostOn==ON && D->boostIon==OFF)
-    {
-      updateCurrent2D_boostIon_1st(D,1);
-      MPI_TransferJ_Yplus(D,D->JxBoost,D->JyBoost,D->JzBoost,D->nx+5,1);
-      MPI_TransferJ_Yminus(D,D->JxBoost,D->JyBoost,D->JzBoost,D->nx+5,1);     
-      removeBoostIon(D,1,D->iend-4,D->iend+1,D->jstart-1,D->jend+1,0,1);
-    }
-*/
+  case ((FIRST-1)*3+2) :    
     updateCurrent2D_1st(&D,nSpecies);
     if(D.L>1)  {
       MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
@@ -84,73 +74,58 @@ void updateCurrent(Domain D)
       MPI_TransferJ_Yplus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
       MPI_TransferJ_Yminus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
     }  else	;
-    if(D.L>1)  {
-      MPI_Transfer3F_Xplus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
-      MPI_Transfer3F_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
-    }  else	;
     break;
-  case ((2-1)*3+2) :
+  case ((SECOND-1)*3+2) :
     updateCurrent2D_2nd(&D);
-//    MPI_TransferJ_Yplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,1);
-//    MPI_TransferJ_Yminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,1);
+    if(D.L>1)  {
+      MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
+      MPI_TransferJ_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
+    }  else	;
+    if(D.M>1)  {
+      MPI_TransferJ_Yplus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
+      MPI_TransferJ_Yminus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
+    }  else	;
     break;
   case ((3-1)*3+2) :
     updateCurrent2D_3rd(&D);
-//    MPI_TransferJ_Yplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,1);
-//    MPI_TransferJ_Yminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,1);
+    if(D.L>1)  {
+      MPI_TransferJ_Xplus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
+      MPI_TransferJ_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
+    }  else	;
+    if(D.M>1)  {
+      MPI_TransferJ_Yplus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
+      MPI_TransferJ_Yminus(&D,D.Jx,D.Jy,D.Jz,D.nxSub+5,1,3);
+    }  else	;
     break;
 
   //3D
   case ((1-1)*3+3) :
     updateCurrent3D_1st(&D);
-/*
-    if(D->M>1)
-    {
-      MPI_TransferJ_Yplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nzSub+5);
-      MPI_TransferJ_Yminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nzSub+5);
-    }
-    if(D->N>1)
-    {
-      MPI_TransferJ_Zplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nySub+5);
-      MPI_TransferJ_Zminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nySub+5);
-    }
-*/
     break;
   case ((2-1)*3+3) :
     updateCurrent3D_2nd(&D);
-/*
-    if(D->M>1)
-    {
-      MPI_TransferJ_Yplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nzSub+5);
-      MPI_TransferJ_Yminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nzSub+5);
-    }
-    if(D->N>1)
-    {
-      MPI_TransferJ_Zplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nySub+5);
-      MPI_TransferJ_Zminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nySub+5);
-    }
-*/
     break;
   case ((3-1)*3+3) :
     updateCurrent3D_3rd(&D);
-/*
-    if(D->M>1)
-    {
-      MPI_TransferJ_Yplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nzSub+5);
-      MPI_TransferJ_Yminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nzSub+5);
-    }
-    if(D->N>1)
-    {
-      MPI_TransferJ_Zplus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nySub+5);
-      MPI_TransferJ_Zminus(D,D->Jx,D->Jy,D->Jz,D->nx+5,D->nySub+5);
-    }
-*/
     break;
   default :
     printf("In updateCurrent, what currentType(%d)?, what dimension(%d)?\n",D.currentType,D.dimension);
   }
-  
 
+  //current share  
+  switch((D.fieldType-1)*3+D.dimension)  {
+  case ((Split-1)*3+1) :    
+    if(D.L>1)  {
+      MPI_Transfer3F_Xplus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+      MPI_Transfer3F_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+    }  else	;
+    break;
+  case ((Split-1)*3+2) :    
+    if(D.L>1)  {
+      MPI_Transfer6F_Xminus(&D,D.Jx,D.Jy,D.Jz,D.JxOld,D.JyOld,D.JzOld,D.nySub+5,1,3);
+    }  else	;
+    break;
+  }
 }
 
 void updateCurrent1D_1st(Domain *D,int nSpecies)
@@ -780,13 +755,27 @@ void updateCurrent2D_1st(Domain *D,int nSpecies)
 
     //initialize J
     k=0;
+ 
+    if(D->fieldType==Pukhov)  {
       for(i=0; i<nxSub+5; i++)
-        for(j=0; j<nySub+5; j++)
-        {
+        for(j=0; j<nySub+5; j++)   {
           D->Jx[i][j][k]=0.0;
           D->Jy[i][j][k]=0.0;
           D->Jz[i][j][k]=0.0;
         }
+    }  else if(D->fieldType==Split)  {
+      for(i=0; i<nxSub+5; i++)
+        for(j=0; j<nySub+5; j++)   {
+          D->JxOld[i][j][k]=D->Jx[i][j][k];
+          D->JyOld[i][j][k]=D->Jy[i][j][k];
+          D->JzOld[i][j][k]=D->Jz[i][j][k];
+          D->Jx[i][j][k]=0.0;
+          D->Jy[i][j][k]=0.0;
+          D->Jz[i][j][k]=0.0;
+        }
+    }  else;
+
+
 
       for(i=istart; i<iend; i++)
         for(j=jstart; j<jend; j++)
