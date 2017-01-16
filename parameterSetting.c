@@ -314,6 +314,14 @@ void parameterSetting(Domain *D,External *Ext, char *input)
      printf("In [PML], pml_d=? (damping length)\n");
      fail=1;
    }
+   //Periodic boundary
+   if(FindParameters("PML",1,"period_boundary",input,str))
+     D->period=whatONOFF(str);
+   else  {
+     printf("In [PML], period_boundary=? (ON/OFF)\n");
+     fail=1;
+   }
+   if(D->period==ON)  D->pmlOn=OFF;
 
 
    //External field parameter setting

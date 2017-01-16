@@ -24,6 +24,10 @@ void fieldSolve(Domain D,double t)
   void MPI_Transfer3F_Xplus();
   void MPI_Transfer6F_Xminus();
   void MPI_Transfer6F_Xplus();
+  void MPI_Transfer3F_Period_Yminus();
+  void MPI_Transfer3F_Period_Yplus();
+  void MPI_Transfer6F_Period_Yminus();
+  void MPI_Transfer6F_Period_Yplus();
   void MPI_Transfer3F_Yminus();
   void MPI_Transfer3F_Yplus();
   void MPI_Transfer6F_Yminus();
@@ -74,6 +78,10 @@ void fieldSolve(Domain D,double t)
       MPI_Transfer3F_Yminus(&D,D.SrC,D.SlC,D.ExC,D.nxSub+5,1,3);
       MPI_Transfer3F_Yplus(&D,D.PrC,D.PlC,D.BxC,D.nxSub+5,1,3);
     } else	;
+    if(D.period==ON)  {
+      MPI_Transfer3F_Period_Yminus(&D,D.SrC,D.SlC,D.ExC,D.nxSub+5,1,3);
+      MPI_Transfer3F_Period_Yplus(&D,D.PrC,D.PlC,D.BxC,D.nxSub+5,1,3);
+    }
 
     solve2D_Split(&D);
     if(D.L>1)  {
@@ -83,6 +91,10 @@ void fieldSolve(Domain D,double t)
     if(D.M>1)  {
       MPI_Transfer6F_Yminus(&D,D.Ex,D.Pr,D.Pl,D.Bx,D.Sr,D.Sl,D.nxSub+5,1,3);
       MPI_Transfer6F_Yplus(&D,D.Ex,D.Pr,D.Pl,D.Bx,D.Sr,D.Sl,D.nxSub+5,1,3);
+    } else	;
+    if(D.period==ON)  {
+      MPI_Transfer6F_Period_Yminus(&D,D.Ex,D.Pr,D.Pl,D.Bx,D.Sr,D.Sl,D.nxSub+5,1,3);
+      MPI_Transfer6F_Period_Yplus(&D,D.Ex,D.Pr,D.Pl,D.Bx,D.Sr,D.Sl,D.nxSub+5,1,3);
     } else	;
 
     break;

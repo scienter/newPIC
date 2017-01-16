@@ -177,6 +177,7 @@ typedef struct _Domain
    int pmlCellBottom;   
    double pmlr;
    double pmld;
+   int period;
 
 }  Domain; 
 
