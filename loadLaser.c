@@ -11,6 +11,7 @@ void loadLaser(Domain *D,LaserList *L,double t)
   void loadLaser2D_Split(Domain *D,LaserList *L,double t);
   void loadLaser3D_DSX(Domain *D,LaserList *L,double t);
   void loadLaser2D_Yee_Pukhov(Domain *D,LaserList *L,double t);
+  void loadLaser1D_Yee_Pukhov(Domain *D,LaserList *L,double t);
 
   if(D->boostOn==OFF)
   {
@@ -24,8 +25,14 @@ void loadLaser(Domain *D,LaserList *L,double t)
 //    case (Split-1)*3+3 :
 //      loadLaser3D_DSX(D,L,t);
 //      break;
+    case (Yee-1)*3+1 :
+      loadLaser1D_Yee_Pukhov(D,L,t);
+      break;
     case (Yee-1)*3+2 :
       loadLaser2D_Yee_Pukhov(D,L,t);
+      break;
+    case (Pukhov-1)*3+1 :
+      loadLaser1D_Yee_Pukhov(D,L,t);
       break;
     case (Pukhov-1)*3+2 :
       loadLaser2D_Yee_Pukhov(D,L,t);
@@ -34,6 +41,54 @@ void loadLaser(Domain *D,LaserList *L,double t)
       printf("In loadLaser, what is field_type? and what is dimension?\n");
     }
   }
+}
+
+void loadLaser1D_Yee_Pukhov(Domain *D,LaserList *L,double t)
+{
+   double rU,rD,longitudinal,t0,flat,omega,amp;
+   int istart,iend,positionX,j,k,laserOK=0;
+   int myrank, nTasks;
+
+   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+
+   istart=D->istart;
+   iend=D->iend;
+
+   rU=L->rU*D->divisionLambda*D->dt;
+   rD=L->rD*D->divisionLambda*D->dt;
+   flat=L->flat*D->divisionLambda*D->dt*L->lambda/D->lambda;
+
+   t0=2.0*rU;
+   omega=2.0*pi*L->omega/D->omega;
+
+   if(t<2.0*rU)
+      longitudinal=L->amplitude*exp(-(t-t0)*(t-t0)/rU/rU);
+   else if(t>=2.0*rU && t<2.0*rU+flat) 
+      longitudinal=L->amplitude*1.0;
+   else if(t>=2.0*rU+flat && t<2.0*rU+flat+2.0*rD) 
+      longitudinal=L->amplitude*exp(-(t-t0)*(t-t0)/rD/rD);
+   else if(t>=2.0*rU+2.0*rD+flat) 
+      longitudinal=0.0;
+
+   positionX=L->loadPointX;
+   if(positionX>=D->minXSub && positionX<D->maxXSub)
+     laserOK=1;
+   else ;
+   positionX=L->loadPointX+istart-D->minXSub;
+
+   if(laserOK==1)   {
+     j=k=0;
+     if(L->polarity==2)     {
+       amp=longitudinal*sin(omega*t);
+       D->Ey[positionX][j][k]=amp;            
+       D->Ey[positionX][j][k]=amp;           
+     } else if(L->polarity==3)   {
+       amp=longitudinal*sin(omega*t);
+       D->Ez[positionX][j][k]=amp;            
+       D->Ez[positionX][j][k]=amp;           
+     } else ;
+   }  else ;   //End of field is OK
 }
 
 void loadLaser2D_Yee_Pukhov(Domain *D,LaserList *L,double t)

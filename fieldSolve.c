@@ -13,6 +13,8 @@ void Bsolve2D_Pukhov(Domain *D);
 void Esolve2D_Pukhov(Domain *D);
 void Bsolve2D_Yee(Domain *D);
 void Esolve2D_Yee(Domain *D);
+void Bsolve1D_Yee_Pukhov(Domain *D);
+void Esolve1D_Yee_Pukhov(Domain *D);
 
 void fieldSolve(Domain D,double t)
 {
@@ -132,6 +134,31 @@ void fieldSolve(Domain D,double t)
 //    MPI_Barrier(MPI_COMM_WORLD);
     break;
 
+  //Yee, Pukhov 1D
+  case (Yee-1)*3+1:
+  case (Pukhov-1)*3+1:
+    Esolve1D_Yee_Pukhov(&D);
+    if(D.L>1)  {
+      MPI_Transfer3F_Xminus(&D,D.Ex,D.Ey,D.Ez,1,1,3);
+      MPI_Transfer3F_Xplus(&D,D.Ex,D.Ey,D.Ez,1,1,3);
+    } else	;
+
+    //load laser
+    if(D.boostOn==OFF)       {
+      L=D.laserList;
+      while(L->next)  {
+        loadLaser(&D,L,t); 
+        L=L->next;
+      }
+    }  else ;
+
+    Bsolve1D_Yee_Pukhov(&D);
+    if(D.L>1)  {
+      MPI_Transfer6F_Xminus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,1,1,3);
+      MPI_Transfer6F_Xplus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,1,1,3);
+    } else	;
+    break;
+
   //Yee 2D
   case (Yee-1)*3+2:
     Esolve2D_Yee(&D);
@@ -149,20 +176,18 @@ void fieldSolve(Domain D,double t)
       L=D.laserList;
       while(L->next)  {
         loadLaser(&D,L,t); 
-//        if(L->direction==1)     loadLaser2D(&D,L,t); 
-//         else if(L->direction==-1)     loadLaserOpp2D(&D,L,t); 
         L=L->next;
       }
     }
 
     Bsolve2D_Yee(&D);
     if(D.L>1)  {
-      MPI_Transfer3F_Xminus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
-      MPI_Transfer3F_Xplus(&D,D.Bx,D.By,D.Bz,D.nySub+5,1,3);
+      MPI_Transfer6F_Xminus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nySub+5,1,3);
+      MPI_Transfer6F_Xplus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nySub+5,1,3);
     } else	;
     if(D.M>1)  {
-      MPI_Transfer3F_Yminus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
-      MPI_Transfer3F_Yplus(&D,D.Bx,D.By,D.Bz,D.nxSub+5,1,3);
+      MPI_Transfer6F_Yminus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nxSub+5,1,3);
+      MPI_Transfer6F_Yplus(&D,D.Bx,D.By,D.Bz,D.BxNow,D.ByNow,D.BzNow,D.nxSub+5,1,3);
     } else	;
     break;
 
@@ -240,6 +265,56 @@ void solveL1D_Split(Domain *D)
   }  
 }
 
+void Bsolve1D_Yee_Pukhov(Domain *D)
+{
+    int i,j,k,istart,iend,jstart,jend,kstart,kend,nxSub,nySub,nzSub;  
+    double dx,dy,dz,dt,oldBx,oldBy,oldBz;
+
+    dx=D->dx;    dy=D->dy;    dt=D->dt; 
+    nxSub=D->nxSub;    nySub=D->nySub;
+    
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
+
+    for(i=istart; i<iend; i++)
+      for(j=jstart; j<jend; j++)
+        for(k=kstart; k<kend; k++)
+        {
+          oldBx=D->Bx[i][j][k];
+          oldBy=D->By[i][j][k];
+          oldBz=D->Bz[i][j][k];
+          D->Bx[i][j][k]=0.0;
+          D->By[i][j][k]+=dt/dx*(D->Ez[i+1][j][k]-D->Ez[i][j][k]);
+          D->Bz[i][j][k]+=-dt/dx*(D->Ey[i+1][j][k]-D->Ey[i][j][k]);
+          D->BxNow[i][j][k]=0.5*(D->Bx[i][j][k]+oldBx);
+          D->ByNow[i][j][k]=0.5*(D->By[i][j][k]+oldBy);
+          D->BzNow[i][j][k]=0.5*(D->Bz[i][j][k]+oldBz);
+        }
+}
+
+void Esolve1D_Yee_Pukhov(Domain *D)
+{
+    int i,j,k,istart,iend,jstart,jend,kstart,kend,nxSub,nySub,nzSub;  
+    double dx,dy,dz,dt;
+
+    dx=D->dx;    dy=D->dy;    dz=D->dz;    dt=D->dt;
+    nxSub=D->nxSub;    nySub=D->nySub;    nzSub=D->nzSub;
+    
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
+
+    for(i=istart; i<iend; i++)
+      for(j=jstart; j<jend; j++)
+        for(k=kstart; k<kend; k++)
+        {
+          D->Ex[i][j][k]+=-2*pi*dt*D->Jx[i][j][k];
+          D->Ey[i][j][k]+=-dt/dx*(D->Bz[i][j][k]-D->Bz[i-1][j][k])-2*pi*dt*D->Jy[i][j][k];
+          D->Ez[i][j][k]+=dt/dx*(D->By[i][j][k]-D->By[i-1][j][k])-2*pi*dt*D->Jz[i][j][k];
+        }
+}
+
 void Bsolve2D_Pukhov(Domain *D)
 {
     int i,j,k,istart,iend,jstart,jend,kstart,kend,nxSub,nySub,nzSub;  
@@ -250,16 +325,11 @@ void Bsolve2D_Pukhov(Domain *D)
     double right1d,right2d,left1d,left2d,up1d,up2d,bt1d,bt2d;
     double rightL,leftL,upL,bottomL,tmp;
 
-    dx=D->dx;
-    dy=D->dy;
-    dt=D->dt;
-    nxSub=D->nxSub;
-    nySub=D->nySub;
+    dx=D->dx;    dy=D->dy;    dt=D->dt;
+    nxSub=D->nxSub;    nySub=D->nySub;
     
-    istart=D->istart;
-    iend=D->iend;
-    jstart=D->jstart;
-    jend=D->jend;
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
 
     k=0;
     ay=ax=0.125*dx/dy;
@@ -338,20 +408,12 @@ void Esolve2D_Pukhov(Domain *D)
     double right1d,right2d,left1d,left2d,up1d,up2d,bt1d,bt2d;
     double rightL,leftL,upL,bottomL,tmp;
 
-    dx=D->dx;
-    dy=D->dy;
-    dz=D->dz;
-    dt=D->dt;
-    nxSub=D->nxSub;
-    nySub=D->nySub;
-    nzSub=D->nzSub;
+    dx=D->dx;    dy=D->dy;    dz=D->dz;    dt=D->dt;
+    nxSub=D->nxSub;    nySub=D->nySub;    nzSub=D->nzSub;
     
-    istart=D->istart;
-    iend=D->iend;
-    jstart=D->jstart;
-    jend=D->jend;
-    kstart=D->kstart;
-    kend=D->kend;
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
 
     ay=ax=0.125*dx/dy;
     bx=1.0-2.0*ax;

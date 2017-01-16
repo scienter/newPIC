@@ -10,8 +10,9 @@ void interpolation(Domain *D,External *Ext)
   void interpolation1D_Split_1st();
   void interpolation2D_Split_1st();
   void interpolation2D_Split_2nd();
-  void interpolation2D_Pukhov_1st();
-  void interpolation2D_Pukhov_2nd();
+  void interpolation1D_Yee_Pukhov_1st();
+  void interpolation2D_Yee_Pukhov_1st();
+  void interpolation2D_Yee_Pukhov_2nd();
 //  void interpolation3D_DSX_1st();
 //  void interpolation3D_DSX_2nd();
 
@@ -26,12 +27,18 @@ void interpolation(Domain *D,External *Ext)
   case ((Split-1)*6+(SECOND-1)*3+2) :
     interpolation2D_Split_2nd(D,Ext);
     break;
-  //Pukhov
-  case ((Pukhov-1)*6+(FIRST-1)*3+2) :
-    interpolation2D_Pukhov_1st(D,Ext);	//2D
+  //Yee, Pukhov
+  case ((Yee-1)*6+(FIRST-1)*3+1) :
+  case ((Pukhov-1)*6+(FIRST-1)*3+1) :
+    interpolation1D_Yee_Pukhov_1st(D,Ext);	//1D
     break;
+  case ((Yee-1)*6+(FIRST-1)*3+2) :
+  case ((Pukhov-1)*6+(FIRST-1)*3+2) :
+    interpolation2D_Yee_Pukhov_1st(D,Ext);	//2D
+    break;
+  case ((Yee-1)*6+(SECOND-1)*3+2) :
   case ((Pukhov-1)*6+(SECOND-1)*3+2) :
-    interpolation2D_Pukhov_2nd(D,Ext);
+    interpolation2D_Yee_Pukhov_2nd(D,Ext);
     break;
 /*
   case ((1-1)*3+2) :
@@ -52,7 +59,53 @@ void interpolation(Domain *D,External *Ext)
   }
 }
 
-void interpolation2D_Pukhov_1st(Domain *D,External *Ext)
+void interpolation1D_Yee_Pukhov_1st(Domain *D,External *Ext)
+{
+   int i,j,k,i1,istart,iend,s,cnt;
+   double E1,E2,E3,B1,B2,B3,extE1,extE2,extE3,extB1,extB2,extB3,x,x1;
+   ptclList *p;
+   int myrank, nprocs;    
+
+   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
+
+   istart=D->istart; iend=D->iend;
+
+   Particle ***particle;
+   particle=D->particle;
+
+   extE1=Ext->E1;   extE2=Ext->E2;   extE3=Ext->E3;
+   extB1=Ext->B1;   extB2=Ext->B2;   extB3=Ext->B3;
+   
+   j=k=0;
+   for(i=istart; i<iend; i++)
+     {
+       for(s=0; s<D->nSpecies; s++)
+       {
+         p=particle[i][j][k].head[s]->pt;
+         while(p)
+         {
+           x=p->x; 
+           i1=(int)(i+x+0.5);
+           x1=x+0.5-((int)(x+0.5));
+
+           B1=(1.0-x) *D->BxNow[i][j][k]    + x *D->BxNow[i+1][j][k];
+           B2=(1.0-x1)*D->ByNow[i1-1][j][k] + x1*D->ByNow[i1][j][k];
+           B3=(1.0-x1)*D->BzNow[i1-1][j][k] + x1*D->BzNow[i1][j][k];
+           E1=(1.0-x1)*D->Ex[i1-1][j][k]    + x1*D->Ex[i1][j][k];
+           E2=(1.0-x) *D->Ey[i][j][k]       + x *D->Ey[i+1][j][k];
+           E3=(1.0-x) *D->Ez[i][j][k]       + x *D->Ez[i+1][j][k];
+
+           p->E1=E1+extE1; p->E2=E2+extE2; p->E3=E3+extE3;
+           p->B1=B1+extB1; p->B2=B2+extB2; p->B3=B3+extB3;
+
+           p=p->next;
+         }
+       }		//for(s)        
+     }		   //for(i,j)
+}
+
+
+void interpolation2D_Yee_Pukhov_1st(Domain *D,External *Ext)
 {
    int i,j,k,i1,j1,k1,istart,iend,jstart,jend,kstart,kend,s,cnt;
    double Bx,By,Bz,Ex,Ey,Ez,extE1,extE2,extE3,extB1,extB2,extB3,x,y,z,x1,y1,z1;
@@ -61,20 +114,15 @@ void interpolation2D_Pukhov_1st(Domain *D,External *Ext)
 
    MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
 
-   istart=D->istart;
-   iend=D->iend;
-   jstart=D->jstart;
-   jend=D->jend;
+   istart=D->istart;   iend=D->iend;
+   jstart=D->jstart;   jend=D->jend;
 
    Particle ***particle;
    particle=D->particle;
 
-   extE1=Ext->E1;
-   extE2=Ext->E2;
-   extE3=Ext->E3;
-   extB1=Ext->B1;
-   extB2=Ext->B2;
-   extB3=Ext->B3;
+   extE1=Ext->E1;   extE2=Ext->E2;
+   extE3=Ext->E3;   extB1=Ext->B1;
+   extB2=Ext->B2;   extB3=Ext->B3;
    
    k=k1=0;
    for(i=istart; i<iend; i++)
@@ -127,7 +175,7 @@ void interpolation2D_Pukhov_1st(Domain *D,External *Ext)
      }		   //for(i,j)
 }
 
-void interpolation2D_Pukhov_2nd(Domain *D,External *Ext)
+void interpolation2D_Yee_Pukhov_2nd(Domain *D,External *Ext)
 {
    int s,i,j,k,ii,jj,i1,j1,k1,istart,iend,jstart,jend,kstart,kend;
    double E1,E2,E3,B1,B2,B3,extE1,extE2,extE3,extB1,extB2,extB3;
@@ -179,7 +227,6 @@ void interpolation2D_Pukhov_2nd(Domain *D,External *Ext)
      }		   //for(i,j)
 }
 
-
 void interpolation1D_Split_1st(Domain *D,External *Ext)
 {
    int i,j,k,i1,istart,iend,s,cnt;
@@ -205,12 +252,12 @@ void interpolation1D_Split_1st(Domain *D,External *Ext)
          p=particle[i][j][k].head[s]->pt;
          while(p)
          {
-           x=p->x; // y=p->y; // z=p->z;
+           x=p->x; 
            i1=(int)(i+x+0.5);
            x1=x+0.5-((int)(x+0.5));
 
            B1=0;
-           E1=(1-x1)*D->Ex[i1-1][j][k] + x1*D->Ex[i1][j][k];
+           E1=(1.0-x) *D->Ex[i][j][k]  + x *D->Ex[i+1][j][k];
            Pr=(1-x1)*D->Pr[i1-1][j][k] + x1*D->Pr[i1][j][k];
            Pl=(1-x1)*D->Pl[i1-1][j][k] + x1*D->Pl[i1][j][k];
            Sr=(1-x1)*D->Sr[i1-1][j][k] + x1*D->Sr[i1][j][k];

@@ -46,6 +46,8 @@ void updateCurrent(Domain D)
   void MPI_Transfer3F_Xminus();
   void MPI_Transfer3F_Xplus();
   void MPI_Transfer6F_Xminus();
+  void MPI_Transfer3F_Period_Yminus();
+  void MPI_Transfer3F_Period_Yplus();
 //  void MPI_TransferJ_Zplus();
 //  void MPI_TransferJ_Zminus();
   void removeBoostIon();

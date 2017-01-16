@@ -572,6 +572,8 @@ void saveCenterField(Domain *D,int iteration)
 
    switch((D->fieldType-1)*3+D->dimension) {
    case (Split-1)*3+1:
+   case (Yee-1)*3+1:
+   case (Pukhov-1)*3+1:
      break;
    case (Split-1)*3+2:
      calculationCenter(D,D->Ex,D->Pr,D->Pl,D->Bx,D->Sr,D->Sl,"Split",iteration);
@@ -580,7 +582,7 @@ void saveCenterField(Domain *D,int iteration)
      calculationCenter(D,D->Ex,D->Ey,D->Ez,D->Bx,D->By,D->Bz,"Pukhov",iteration);
      break;
    default :
-     printf("what field_type? and what dimension?\n");
+     printf("In cenField save, what field_type? and what dimension?\n");
    }
 }
 
@@ -733,47 +735,35 @@ void saveField(Domain *D,int iteration)
       }
       fclose(out);
       break;
-    case (Yee-1)*3+2 :
-      k=0;
-//      i=(int)(0.5*(istart+iend-1));
-      for(i=istart; i<iend; i++)
-      {
-        for(j=jstart; j<jend; j++)
-        {
-          x=(i-2+D->minXSub)*D->dx*D->lambda;
-          y=(j-2+D->minYSub)*D->dy*D->lambda;
-          Ex=D->Ex[i][j][k];    
-          Ey=D->Ey[i][j][k];
-          Ez=D->Ez[i][j][k];
-          Bx=D->Bx[i][j][k];    
-          By=D->By[i][j][k];    
-          Bz=D->Bz[i][j][k];    
-          fprintf(out,"%g %g %g %g %g %g %g %g\n",x,y,Ex,Ey,Ez,Bx,By,Bz);
-        }
-        fprintf(out,"\n");                 
+
+    case (Yee-1)*3+1:
+    case (Pukhov-1)*3+1:
+      j=k=0;
+      for(i=istart; i<iend; i++)      {
+        x=(i-2+D->minXSub)*D->dx*D->lambda;
+        Ex=D->Ex[i][j][k]; Ey=D->Ey[i][j][k]; Ez=D->Ez[i][j][k];
+        Bx=D->Bx[i][j][k]; By=D->By[i][j][k]; Bz=D->Bz[i][j][k];
+        fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Ey,Ez,Bx,By,Bz);
       }
       fclose(out);
       break;
+
+    case (Yee-1)*3+2 :
     case (Pukhov-1)*3+2 :
       k=0;
-      for(i=istart; i<iend; i++)
-      {
-        for(j=jstart; j<jend; j++)
-        {
+      for(i=istart; i<iend; i++)      {
+        for(j=jstart; j<jend; j++)        {
           x=(i-2+D->minXSub)*D->dx*D->lambda;
           y=(j-2+D->minYSub)*D->dy*D->lambda;
-          Ex=D->Ex[i][j][k];    
-          Ey=D->Ey[i][j][k];
-          Ez=D->Ez[i][j][k];
-          Bx=D->Bx[i][j][k];    
-          By=D->By[i][j][k];    
-          Bz=D->Bz[i][j][k];    
+          Ex=D->Ex[i][j][k]; Ey=D->Ey[i][j][k]; Ez=D->Ez[i][j][k];
+          Bx=D->Bx[i][j][k]; By=D->By[i][j][k]; Bz=D->Bz[i][j][k];    
           fprintf(out,"%g %g %g %g %g %g %g %g\n",x,y,Ex,Ey,Ez,Bx,By,Bz);
         }
         fprintf(out,"\n");                 
       }
       fclose(out);
       break;
+
     default :
       printf("what field_type? and what dimension?\n");
     }
