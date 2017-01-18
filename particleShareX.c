@@ -49,7 +49,7 @@ void particleShareX(Domain D)
 void MPI_TransferP_Xplus(Domain *D
           ,int istart,int iend,int jstart,int jend,int kstart,int kend)
 {
-   int i,j,k,n,s,numP,cnt,totalData,sendData=13,nxSub,nySub,nzSub;   
+   int i,j,k,n,s,numP,cnt,totalData,sendData=19,nxSub,nySub,nzSub;   
    int myrank, nTasks, rank;
    Particle ***particle;
    particle=D->particle;     
@@ -112,6 +112,12 @@ void MPI_TransferP_Xplus(Domain *D
               upP[n*sendData+10]=(double)s;  
               upP[n*sendData+11]=(double)(p->core);  
               upP[n*sendData+12]=p->weight;  
+              upP[n*sendData+13]=p->p1Old1;  
+              upP[n*sendData+14]=p->p2Old1;  
+              upP[n*sendData+15]=p->p3Old1;  
+              upP[n*sendData+16]=p->p1Old2;  
+              upP[n*sendData+17]=p->p2Old2;  
+              upP[n*sendData+18]=p->p3Old2;  
               p=p->next;
               n++;
             }
@@ -142,6 +148,12 @@ void MPI_TransferP_Xplus(Domain *D
         New->index=(int)(upP[n*sendData+9]);
         New->core=(int)(upP[n*sendData+11]);
         New->weight=upP[n*sendData+12];
+        New->p1Old1=upP[n*sendData+13];
+        New->p2Old1=upP[n*sendData+14];
+        New->p3Old1=upP[n*sendData+15];
+        New->p1Old2=upP[n*sendData+16];
+        New->p2Old2=upP[n*sendData+17];
+        New->p3Old2=upP[n*sendData+18];
       }
     }
     free(upP);
@@ -193,6 +205,12 @@ void MPI_TransferP_Xplus(Domain *D
               upP[n*sendData+10]=(double)s;   
               upP[n*sendData+11]=(double)(p->core);   
               upP[n*sendData+12]=p->weight;  
+              upP[n*sendData+13]=p->p1Old1;  
+              upP[n*sendData+14]=p->p2Old1;  
+              upP[n*sendData+15]=p->p3Old1;  
+              upP[n*sendData+16]=p->p1Old2;  
+              upP[n*sendData+17]=p->p2Old2;  
+              upP[n*sendData+18]=p->p3Old2;  
               p=p->next;
               n++;
             }
@@ -223,6 +241,12 @@ void MPI_TransferP_Xplus(Domain *D
         New->index=(int)(upP[n*sendData+9]);
         New->core=(int)(upP[n*sendData+11]);
         New->weight=upP[n*sendData+12];
+        New->p1Old1=upP[n*sendData+13];
+        New->p2Old1=upP[n*sendData+14];
+        New->p3Old1=upP[n*sendData+15];
+        New->p1Old2=upP[n*sendData+16];
+        New->p2Old2=upP[n*sendData+17];
+        New->p3Old2=upP[n*sendData+18];
       }
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -233,7 +257,7 @@ void MPI_TransferP_Xplus(Domain *D
 void MPI_TransferP_Xminus(Domain *D
           ,int istart,int iend,int jstart,int jend,int kstart,int kend)
 {
-   int i,j,k,n,s,numP,cnt,totalData,sendData=13,nxSub,nySub,nzSub;
+   int i,j,k,n,s,numP,cnt,totalData,sendData=19,nxSub,nySub,nzSub;
    int myrank, nTasks, rank;
    Particle ***particle;
    particle=D->particle;     
@@ -298,6 +322,12 @@ void MPI_TransferP_Xminus(Domain *D
               btP[n*sendData+10]=(double)s;  
               btP[n*sendData+11]=(double)(p->core);  
               btP[n*sendData+12]=p->weight;  
+              btP[n*sendData+13]=p->p1Old1;  
+              btP[n*sendData+14]=p->p2Old1;  
+              btP[n*sendData+15]=p->p3Old1;  
+              btP[n*sendData+16]=p->p1Old2;  
+              btP[n*sendData+17]=p->p2Old2;  
+              btP[n*sendData+18]=p->p3Old2;  
               p=p->next;
               n++;
             }
@@ -329,6 +359,12 @@ void MPI_TransferP_Xminus(Domain *D
         New->index=(int)(btP[n*sendData+9]);
         New->core=(int)(btP[n*sendData+11]);
         New->weight=btP[n*sendData+12];
+        New->p1Old1=btP[n*sendData+13];
+        New->p2Old1=btP[n*sendData+14];
+        New->p3Old1=btP[n*sendData+15];
+        New->p1Old2=btP[n*sendData+16];
+        New->p2Old2=btP[n*sendData+17];
+        New->p3Old2=btP[n*sendData+18];
       }
     }
     free(btP);
@@ -384,6 +420,12 @@ void MPI_TransferP_Xminus(Domain *D
               btP[n*sendData+10]=(double)s;  
               btP[n*sendData+11]=(double)(p->core);  
               btP[n*sendData+12]=p->weight;  
+              btP[n*sendData+13]=p->p1Old1;  
+              btP[n*sendData+14]=p->p2Old1;  
+              btP[n*sendData+15]=p->p3Old1;  
+              btP[n*sendData+16]=p->p1Old2;  
+              btP[n*sendData+17]=p->p2Old2;  
+              btP[n*sendData+18]=p->p3Old2;  
               p=p->next;
               n++;
             }
@@ -417,6 +459,12 @@ void MPI_TransferP_Xminus(Domain *D
         New->index=(int)(btP[n*sendData+9]);
         New->core=(int)(btP[n*sendData+11]);
         New->weight=btP[n*sendData+12];
+        New->p1Old1=btP[n*sendData+13];
+        New->p2Old1=btP[n*sendData+14];
+        New->p3Old1=btP[n*sendData+15];
+        New->p1Old2=btP[n*sendData+16];
+        New->p2Old2=btP[n*sendData+17];
+        New->p3Old2=btP[n*sendData+18];
       }
 
     }

@@ -105,7 +105,13 @@ void particlePush1D(Domain *D)
               for(m=0; m<3; m++)   
                 pPlus[l]+=operate[l][m]*pMinus[m];
             }
-            //Updated momentum              
+            //Updated momentum             
+            p->p1Old2=p->p1Old1;
+            p->p2Old2=p->p2Old1;
+            p->p3Old2=p->p3Old1;
+            p->p1Old1=p->p1;
+            p->p2Old1=p->p2;
+            p->p3Old1=p->p3;
             p->p1=pPlus[0]+coef*(p->E1); 
             p->p2=pPlus[1]+coef*(p->E2);    
             p->p3=pPlus[2]+coef*(p->E3);

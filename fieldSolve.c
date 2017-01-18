@@ -260,8 +260,8 @@ void solveL1D_Split(Domain *D)
   j=k=0;
   for(i=istart; i<iend; i++)
   {
-    D->Pl[i][j][k]=D->Pl[i+1][j][k]-pi*dt*D->Jy[i+1][j][k];
-    D->Sl[i][j][k]=D->Sl[i+1][j][k]-pi*dt*D->Jz[i+1][j][k];
+    D->Pl[i][j][k]=D->Pl[i+1][j][k]-pi*dt*D->Jy[i][j][k];
+    D->Sl[i][j][k]=D->Sl[i+1][j][k]-pi*dt*D->Jz[i][j][k];
   }  
 }
 

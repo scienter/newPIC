@@ -196,6 +196,7 @@ void parameterSetting(Domain *D,External *Ext, char *input)
    if(FindParameters("Save",1,"resolution_rate_Z",input,str)) 
       D->resolZ=atoi(str);
    else  D->resolZ=1;
+
    if(FindParameters("Domain",1,"minX",input,str)) 
    {
       minX=atof(str);
@@ -826,6 +827,9 @@ int findLoadParameters(int rank, LoadList *LL,Domain *D,char *input)
          printf("in [Plasma], numberInCell=? \n");
          fail=1;
       }
+      if(FindParameters("Plasma",rank,"target_weight",input,str)) 
+         LL->targetW=atof(str);
+      else  LL->targetW=1.0/(double)(LL->numberInCell);
       if(FindParameters("Plasma",rank,"startIndex",input,str)) 
          LL->index=atoi(str);
       else  

@@ -108,17 +108,15 @@ int main(int argc, char *argv[])
              saveBDump(D,iteration);
              saveEDump(D,iteration);
              saveJDump(D,iteration);
-             saveP_GridHDF(D,iteration);
-         } else	;
-         if(iteration+1==D.resolStep)   {
-             saveBDump(D,iteration);
-             saveJDump(D,iteration);
-             saveP_GridHDF(D,iteration);
          } else	;
          if(iteration-1==D.resolStep)   {
              saveBDump(D,iteration);
              saveJDump(D,iteration);
-             saveP_GridHDF(D,iteration);
+             saveDumpParticleResolHDF(&D,iteration);
+         } else	;
+         if(iteration+1==D.resolStep)   {
+             saveBDump(D,iteration);
+             saveJDump(D,iteration);
          } else	;
        }      else; 
 
@@ -141,7 +139,7 @@ int main(int argc, char *argv[])
 
        particlePush(&D);
 
-       updateCurrent(D);
+       updateCurrent(D);//lala
 
        if(iteration>=D.nx && D.moving==ON && D.boostOn==OFF 
           && (iteration-D.nx)%D.shiftDuration!=0 )    {

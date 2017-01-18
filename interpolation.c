@@ -257,7 +257,7 @@ void interpolation1D_Split_1st(Domain *D,External *Ext)
            x1=x+0.5-((int)(x+0.5));
 
            B1=0;
-           E1=(1.0-x) *D->Ex[i][j][k]  + x *D->Ex[i+1][j][k];
+           E1=(1-x1)*D->Ex[i1-1][j][k] + x1*D->Ex[i1][j][k];
            Pr=(1-x1)*D->Pr[i1-1][j][k] + x1*D->Pr[i1][j][k];
            Pl=(1-x1)*D->Pl[i1-1][j][k] + x1*D->Pl[i1][j][k];
            Sr=(1-x1)*D->Sr[i1-1][j][k] + x1*D->Sr[i1][j][k];

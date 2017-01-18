@@ -139,6 +139,18 @@ void updateCurrent(Domain D)
       MPI_Transfer6F_Xminus(&D,D.Jx,D.Jy,D.Jz,D.JxOld,D.JyOld,D.JzOld,D.nySub+5,1,3);
     }  else	;
     break;
+  case ((Yee-1)*3+1) :    
+  case ((Pukhov-1)*3+1) :    
+    if(D.L>1)  {
+      MPI_Transfer3F_Xminus(&D,D.Jx,D.Jy,D.Jz,1,1,3);
+    }  else	;
+    break;
+  case ((Yee-1)*3+2) :    
+  case ((Pukhov-1)*3+2) :    
+    if(D.L>1)  {
+      MPI_Transfer3F_Xminus(&D,D.Jx,D.Jy,D.Jz,D.nySub+5,1,3);
+    }  else	;
+    break;
   }
 }
 
@@ -186,8 +198,8 @@ void updateCurrent1D_1st(Domain *D,int nSpecies)
 
     //initialize J
     j=k=0;
-      for(i=0; i<nxSub+5; i++)
-        {
+    if(D->fieldType==Split)  {
+      for(i=0; i<nxSub+5; i++)        {
           D->JxOld[i][j][k]=D->Jx[i][j][k];
           D->JyOld[i][j][k]=D->Jy[i][j][k];
           D->JzOld[i][j][k]=D->Jz[i][j][k];
@@ -195,6 +207,13 @@ void updateCurrent1D_1st(Domain *D,int nSpecies)
           D->Jy[i][j][k]=0.0;
           D->Jz[i][j][k]=0.0;
         }
+    } else {
+      for(i=0; i<nxSub+5; i++)        {
+          D->Jx[i][j][k]=0.0;
+          D->Jy[i][j][k]=0.0;
+          D->Jz[i][j][k]=0.0;
+        }
+    }
 
       for(i=istart; i<iend; i++)
           for(s=0; s<nSpecies; s++)

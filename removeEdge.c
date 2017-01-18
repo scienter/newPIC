@@ -127,8 +127,7 @@ void removeEdge1D(Domain *D)
             tmp=p->next;
             particle[i][j][k].head[s]->pt=tmp; 
             p->next=NULL;
-            if(p!=NULL)
-              free(p);
+            free(p);
             p=particle[i][j][k].head[s]->pt;
           }
         }

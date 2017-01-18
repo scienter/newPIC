@@ -687,8 +687,8 @@ void saveField(Domain *D,int iteration)
       j=k=0;
       for(i=istart; i<iend; i++)      {
         x=(i-2+D->minXSub)*D->dx*D->lambda;
-        Ex=D->Ex[i][j][k]; Pr=D->Pr[i][j][k]; Pl=D->Sr[i][j][k];
-        Bx=0.0;            Sr=D->Sl[i][j][k]; Sl=D->Pr[i][j][k];
+        Ex=D->Ex[i][j][k]; Pr=D->Pr[i][j][k]; Pl=D->Pl[i][j][k];
+        Bx=0.0;            Sr=D->Sr[i][j][k]; Sl=D->Sl[i][j][k];
         fprintf(out,"%g %g %g %g %g %g %g\n",x,Ex,Pr,Pl,Bx,Sr,Sl);
       }
       fclose(out);

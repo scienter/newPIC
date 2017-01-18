@@ -24,7 +24,6 @@ void deleteField(double ***field,int nx,int ny,int nz);
 void saveParticle1D_High_HDF(Domain *D,int iteration);
 void deleteParticle(Domain *D,int i,int j,int k,int s);
 void storeParticle(Domain *D,int i,int j,int k,int s,double *x2,double *w2,double *px2,double *py2,double *pz2,double dx,double minX);
-void reCreateParticle1D(Domain *D,int i,int j,int k,int s,double targetW);
 
 void saveP_GridHDF(Domain D,int iteration)
 {
@@ -39,6 +38,7 @@ void saveP_GridHDF(Domain D,int iteration)
 
 void saveParticle1D_High_HDF(Domain *D,int iteration)
 {
+    double targetW=0.2;
     int i,j,k,s,l,m,istart,iend,jstart,jend,kstart,kend,flag;
     int nxSub,nySub,nzSub,rankX,rankY,rankZ;
     int totalCnt,cnt,index,indexI,numQ;
@@ -51,7 +51,7 @@ void saveParticle1D_High_HDF(Domain *D,int iteration)
     Particle ***particle;
     particle=D->particle;
     ptclList *p;
-    LoadList *LL;
+    FILE *out;
 
     int myrank, nTasks;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
@@ -86,8 +86,7 @@ void saveParticle1D_High_HDF(Domain *D,int iteration)
     } else      ;
     MPI_Barrier(MPI_COMM_WORLD);
 
-    LL=D->loadList;  s=0;
-    while(LL->next)      
+    for(s=0; s<D->nSpecies; s++)
     {
       if(myrank==0)    {
         file_id=H5Fopen(fileName,H5F_ACC_RDWR,H5P_DEFAULT);
@@ -101,11 +100,106 @@ void saveParticle1D_High_HDF(Domain *D,int iteration)
       j=k=0;
       for(i=D->istart; i<D->iend; i++)  
       {
-        reCreateParticle1D(D,i,j,k,s,LL->targetW);
+        p=particle[i][j][k].head[s]->pt; totalCnt=0;
+        while(p)  { totalCnt++; p=p->next; }
+        cnt=(int)(1.0/targetW);
+
+        xList=(double *)malloc(totalCnt*sizeof(double ));
+        xBound1=(double *)malloc(cnt*sizeof(double ));
+
+        index=0; p=particle[i][j][k].head[s]->pt;
+        while(p)  { xList[index]=p->x; p=p->next; index++; }
+        stride=1; N=totalCnt;
+        gsl_sort(xList,stride,N);
+
+        dx=targetW;
+        index=0; minX=0.0;
+        for(l=0; l<totalCnt-1; l++)  {
+          maxX=(xList[l]+xList[l+1])*0.5;
+          gapX=maxX-minX;
+          if(gapX>dx)  {
+            xBound1[index]=maxX;
+            minX=maxX;
+            index++;
+          } else ;
+        }
+
+        xBound=(double *)malloc((index+2)*sizeof(double ));
+        xBound[0]=0.0; xBound[index+1]=1.0;
+        for(l=0; l<index; l++)
+          xBound[l+1]=xBound1[l];
+
+        numQ=index+1;
+        Q=(double **)malloc(numQ*sizeof(double *));
+        Px=(double **)malloc(numQ*sizeof(double *));
+        Py=(double **)malloc(numQ*sizeof(double *));
+        Pz=(double **)malloc(numQ*sizeof(double *));
+        for(l=0; l<numQ; l++) {
+          Q[l]=(double *)malloc(2*sizeof(double ));
+          Px[l]=(double *)malloc(2*sizeof(double ));
+          Py[l]=(double *)malloc(2*sizeof(double ));
+          Pz[l]=(double *)malloc(2*sizeof(double ));
+        }
+        for(l=0; l<numQ; l++)
+          for(m=0; m<2; m++) {
+            Q[l][m]=0.0; Px[l][m]=0.0; Py[l][m]=0.0; Pz[l][m]=0.0;
+          }
+
+        p=particle[i][j][k].head[s]->pt;
+        minX=0.0; index=0;
+        while(p)  {
+          x=p->x;       weight=p->weight;
+          indexI=0; flag=1;
+          while(flag==1)  {
+            if(x>=xBound[indexI] && x<xBound[indexI+1]) flag=0;
+            else indexI++;
+          }
+          minX=xBound[indexI];  maxX=xBound[indexI+1];
+          px=p->p1;     py=p->p2;         pz=p->p3;
+          tmp2=weight/(maxX-minX);
+          Q[indexI][0]+=(maxX-x)*tmp2;     Q[indexI][1]+=(x-minX)*tmp2;
+          Px[indexI][0]+=(maxX-x)*tmp2*px; Px[indexI][1]+=(x-minX)*tmp2*px;
+          Py[indexI][0]+=(maxX-x)*tmp2*py; Py[indexI][1]+=(x-minX)*tmp2*py;
+          Pz[indexI][0]+=(maxX-x)*tmp2*pz; Pz[indexI][1]+=(x-minX)*tmp2*pz;
+          p=p->next;
+        }
+        deleteParticle(D,i,j,k,s);
+
+        for(l=0; l<numQ; l++)  {
+          W=Q[l][0]+Q[l][1];
+          if(W>0)  {
+            minX=xBound[l];     maxX=xBound[l+1];
+            x0=Q[l][1]/W;       dx=maxX-minX;
+            w2[0]=Q[l][0];      w2[1]=Q[l][1];
+            x2[0]=x0*0.5;       x2[1]=(1.0+x0)*0.5;
+            px2[0]=((Px[l][0]-Px[l][1])+(Px[l][0]+Px[l][1])*x0)/w2[0];
+            py2[0]=((Py[l][0]-Py[l][1])+(Py[l][0]+Py[l][1])*x0)/w2[0];
+            pz2[0]=((Pz[l][0]-Pz[l][1])+(Pz[l][0]+Pz[l][1])*x0)/w2[0];
+            px2[1]=(2*Px[l][1]-(Px[l][0]+Px[l][1])*x0)/w2[1];
+            py2[1]=(2*Py[l][1]-(Py[l][0]+Py[l][1])*x0)/w2[1];
+            pz2[1]=(2*Pz[l][1]-(Pz[l][0]+Pz[l][1])*x0)/w2[1];
+            storeParticle(D,i,j,k,s,x2,w2,px2,py2,pz2,dx,minX);
+          } else;
+        }
+
+        for(l=0; l<numQ; l++) {
+          free(Q[l]);
+          free(Px[l]);
+          free(Py[l]);
+          free(Pz[l]);
+        }
+        free(Q);
+        free(Px);
+        free(Py);
+        free(Pz);
+        free(xList);
+        free(xBound);
+        free(xBound1);
+
       }		//End of for(i,j,k)
-      LL=LL->next; s++;
+
     }		//End of for(s)
-/*
+
   j=k=0;
   out=fopen("reParticle","w");
   for(i=D->istart; i<D->iend; i++)  
@@ -120,119 +214,7 @@ void saveParticle1D_High_HDF(Domain *D,int iteration)
     }
   }    
   fclose(out);
-*/
 }
-
-void reCreateParticle1D(Domain *D,int i,int j,int k,int s,double targetW)
-{
-   int l,m,cnt,totalCnt,index,numQ,flag,indexI;
-   double minX,maxX,gapX,x0,W,x,px,py,pz,tmp2,dx,weight;
-   double *xList,*xBound,*xBound1,**Q,**Px,**Py,**Pz;
-   double px2[2],py2[2],pz2[2],x2[2],w2[2];
-   size_t N,stride;
-   Particle ***particle;
-   particle=D->particle;
-   ptclList *p;
-
-   p=particle[i][j][k].head[s]->pt; totalCnt=0;
-   while(p)  { totalCnt++; p=p->next; }
-   cnt=(int)(1.0/targetW);
-
-   xList=(double *)malloc(totalCnt*sizeof(double ));
-   xBound1=(double *)malloc(cnt*sizeof(double ));
-
-   index=0; p=particle[i][j][k].head[s]->pt;
-   while(p)  { xList[index]=p->x; p=p->next; index++; }
-   stride=1; N=totalCnt;
-   gsl_sort(xList,stride,N);
-
-   dx=targetW;
-   index=0; minX=0.0;
-   for(l=0; l<totalCnt-1; l++)  {
-     maxX=(xList[l]+xList[l+1])*0.5;
-     gapX=maxX-minX;
-     if(gapX>dx)  {
-       xBound1[index]=maxX;
-       minX=maxX;
-       index++;
-     } else ;
-   }
-
-   xBound=(double *)malloc((index+2)*sizeof(double ));
-   xBound[0]=0.0; xBound[index+1]=1.0;
-   for(l=0; l<index; l++)
-     xBound[l+1]=xBound1[l];
-
-   numQ=index+1;
-   Q=(double **)malloc(numQ*sizeof(double *));
-   Px=(double **)malloc(numQ*sizeof(double *));
-   Py=(double **)malloc(numQ*sizeof(double *));
-   Pz=(double **)malloc(numQ*sizeof(double *));
-   for(l=0; l<numQ; l++) {
-     Q[l]=(double *)malloc(2*sizeof(double ));
-     Px[l]=(double *)malloc(2*sizeof(double ));
-     Py[l]=(double *)malloc(2*sizeof(double ));
-     Pz[l]=(double *)malloc(2*sizeof(double ));
-   }
-   for(l=0; l<numQ; l++)
-     for(m=0; m<2; m++) {
-       Q[l][m]=0.0; Px[l][m]=0.0; Py[l][m]=0.0; Pz[l][m]=0.0;
-     }
-
-   p=particle[i][j][k].head[s]->pt;
-   minX=0.0; index=0;
-   while(p)  {
-     x=p->x;       weight=p->weight;
-     indexI=0; flag=1;
-     while(flag==1)  {
-       if(x>=xBound[indexI] && x<xBound[indexI+1]) flag=0;
-       else indexI++;
-     }
-     minX=xBound[indexI];  maxX=xBound[indexI+1];
-     px=p->p1;     py=p->p2;         pz=p->p3;
-     tmp2=weight/(maxX-minX);
-     Q[indexI][0]+=(maxX-x)*tmp2;     Q[indexI][1]+=(x-minX)*tmp2;
-     Px[indexI][0]+=(maxX-x)*tmp2*px; Px[indexI][1]+=(x-minX)*tmp2*px;
-     Py[indexI][0]+=(maxX-x)*tmp2*py; Py[indexI][1]+=(x-minX)*tmp2*py;
-     Pz[indexI][0]+=(maxX-x)*tmp2*pz; Pz[indexI][1]+=(x-minX)*tmp2*pz;
-     p=p->next;
-   }
-   deleteParticle(D,i,j,k,s);
-
-   for(l=0; l<numQ; l++)  {
-     W=Q[l][0]+Q[l][1];
-     if(W>0)  {
-       minX=xBound[l];     maxX=xBound[l+1];
-       x0=Q[l][1]/W;       dx=maxX-minX;
-       w2[0]=Q[l][0];      w2[1]=Q[l][1];
-       x2[0]=x0*0.5;       x2[1]=(1.0+x0)*0.5;
-       px2[0]=((Px[l][0]-Px[l][1])+(Px[l][0]+Px[l][1])*x0)/w2[0];
-       py2[0]=((Py[l][0]-Py[l][1])+(Py[l][0]+Py[l][1])*x0)/w2[0];
-       pz2[0]=((Pz[l][0]-Pz[l][1])+(Pz[l][0]+Pz[l][1])*x0)/w2[0];
-       px2[1]=(2*Px[l][1]-(Px[l][0]+Px[l][1])*x0)/w2[1];
-       py2[1]=(2*Py[l][1]-(Py[l][0]+Py[l][1])*x0)/w2[1];
-       pz2[1]=(2*Pz[l][1]-(Pz[l][0]+Pz[l][1])*x0)/w2[1];
-       storeParticle(D,i,j,k,s,x2,w2,px2,py2,pz2,dx,minX);
-     } else;
-   }
-
-   for(l=0; l<numQ; l++) {
-     free(Q[l]);
-     free(Px[l]);
-     free(Py[l]);
-     free(Pz[l]);
-   }
-   free(Q);
-   free(Px);
-   free(Py);
-   free(Pz);
-   free(xList);
-   free(xBound);
-   free(xBound1);
-}
-
-
-
 /*
 void save2D_P_Grid_HDF(Domain *D,int iteration)
 {

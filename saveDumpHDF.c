@@ -12,6 +12,7 @@ void saveParticleComp_Double(double *data,char *fileName,char *dataName,int tota
 void saveParticleComp_Int(int *data,char *fileName,char *dataName,int totalCnt,int cnt,int offSet);
 void saveDoubleMeta(char *fileName,char *dataName,double *data,int dataCnt);
 void saveIntMeta(char *fileName,char *dataName,int *data,int dataCnt);
+double calInterpolation(double y1,double y2,double y3,double resolX);
 
 void saveDump(Domain D,int iteration)
 {
@@ -185,6 +186,12 @@ void saveDumpParticleHDF(Domain *D,int iteration)
         sprintf(dataName,"%dtotalCnt",s);
         saveIntMeta(name,dataName,&cntList[s],1);
       }
+      saveIntMeta(name,"/nx",&D->nx,1);
+      saveIntMeta(name,"/ny",&D->ny,1);
+      saveIntMeta(name,"/nz",&D->nz,1);
+      saveIntMeta(name,"/minXDomain",&D->minXDomain,1);
+      saveIntMeta(name,"/minYDomain",&D->minYDomain,1);
+      saveIntMeta(name,"/minZDomain",&D->minZDomain,1);
     }  else	;
 }
 
@@ -195,15 +202,11 @@ void saveJDump(Domain D,int iteration)
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
 
-  switch ((D.fieldType-1)*3+D.dimension)  {
-  case ((Pukhov-1)*3+2) :
-    if(D.saveDumpMode==HDF)  {
-      saveJDumpHDF(&D,iteration);
-      if(myrank==0) 
-        printf("resolJ%d.h5\n",iteration);
-    }
-    break;
-  }
+  if(D.saveDumpMode==HDF)  {
+    saveJDumpHDF(&D,iteration);
+    if(myrank==0) 
+      printf("resolJ%d.h5\n",iteration);
+  } else;
 }
 
 
@@ -214,15 +217,11 @@ void saveBDump(Domain D,int iteration)
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
 
-  switch ((D.fieldType-1)*3+D.dimension)  {
-  case ((Pukhov-1)*3+2) :
-    if(D.saveDumpMode==HDF)  {
-      saveBDumpHDF(&D,iteration);
-      if(myrank==0) 
-        printf("resolB%d.h5\n",iteration);
-    }
-    break;
-  }
+  if(D.saveDumpMode==HDF)  {
+    saveBDumpHDF(&D,iteration);
+    if(myrank==0) 
+      printf("resolB%d.h5\n",iteration);
+  } else;
 }
 
 void saveEDump(Domain D,int iteration)
@@ -232,15 +231,11 @@ void saveEDump(Domain D,int iteration)
   MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
   MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
 
-  switch ((D.fieldType-1)*3+D.dimension)  {
-  case ((Pukhov-1)*3+2) :
-    if(D.saveDumpMode==HDF)  {
-      saveEDumpHDF(&D,iteration);
-      if(myrank==0) 
-        printf("resolE%d.h5\n",iteration);
-    }
-    break;
-  }
+  if(D.saveDumpMode==HDF)  {
+    saveEDumpHDF(&D,iteration);
+    if(myrank==0) 
+      printf("resolE%d.h5\n",iteration);
+  } else;
 }
 
 void saveDumpFieldHDF(Domain *D,int iteration)
@@ -341,12 +336,11 @@ void saveDumpFieldHDF(Domain *D,int iteration)
 void saveDumpParticleResolHDF(Domain *D,int iteration)
 {
     int i,j,k,s,istart,iend,jstart,jend,kstart,kend;
-    int nxSub,nySub,nzSub,cnt,totalCnt,index,start,ii,n,tmp;
-    int resolX,resolY,resolZ,minXSub,minYSub;
-    double x,y,z,y1,y2,y3,a,b,c,dx,dy,dz;
-    char name[100],name2[100];
-    double *saveDouble;
-    int *recv,*saveInt,*offSetRank;
+    int cnt,totalCnt,index,start,cntList[D->nSpecies];
+    int minXSub,minYSub,minZSub,nxSub,nySub,nzSub;
+    char name[100],dataName[100];
+    double *data,px,py,pz;
+    int *recv,*offSetRank;
     Particle ***particle;
     particle=D->particle;
     ptclList *p;
@@ -355,210 +349,164 @@ void saveDumpParticleResolHDF(Domain *D,int iteration)
     int myrank, nTasks;
     MPI_Comm_rank(MPI_COMM_WORLD, &myrank);
     MPI_Comm_size(MPI_COMM_WORLD, &nTasks);
+
+    hid_t file_id,group_id,plist_id,dset_id,attr_id,as_id;
+    hid_t filespace,memspace;
+    hsize_t dimsf[2],count[2],offset[2],block[2],stride[2],a_dims,metaDim[1];
+    herr_t ierr;
+
+    nxSub=D->nxSub; nySub=D->nySub; nzSub=D->nzSub;
+
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
+    minXSub=D->minXSub;
+    minYSub=D->minYSub;
+    minZSub=D->minZSub;
+
+    plist_id=H5Pcreate(H5P_FILE_ACCESS);
+    ierr=H5Pset_fapl_mpio(plist_id,MPI_COMM_WORLD,MPI_INFO_NULL);
+    //create file
+    sprintf(name,"dumpResolParticle%d.h5",iteration);
+    file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,plist_id);
+    ierr=H5Pclose(plist_id);
+
     recv = (int *)malloc(nTasks*sizeof(int ));
-    offSetRank = (int *)malloc(nTasks*sizeof(int ));
 
-    hid_t file_id,group_id;
-    herr_t status;
-
-    nxSub=D->nxSub;
-    nySub=D->nySub;
-    nzSub=D->nzSub;
-    istart=D->istart;
-    iend=nxSub+2;
-    jstart=D->jstart;
-    jend=nySub+2;
-    kstart=D->kstart;
-    kend=nzSub+2;
-
-    switch((D->fieldType-1)*3+D->dimension) {
-    //2D
-    case (Pukhov-1)*3+2:
-      sprintf(name,"resolParticle%d.h5",iteration);
-      if(myrank==0)   {
-        file_id=H5Fcreate(name,H5F_ACC_TRUNC,H5P_DEFAULT,H5P_DEFAULT);
-        H5Fclose(file_id);
-      }      else ;
-
-      if(myrank==0)  {
-        saveIntMeta(name,"/nSpecies",&D->nSpecies,1);
-        saveIntMeta(name,"/nx",&D->nx,1);
-        saveIntMeta(name,"/ny",&D->ny,1);
-        saveIntMeta(name,"/nz",&D->nz,1);
-        saveIntMeta(name,"/minXDomain",&D->minXDomain,1);
-        saveIntMeta(name,"/minYDomain",&D->minYDomain,1);
-        saveIntMeta(name,"/minZDomain",&D->minZDomain,1);
-        saveDoubleMeta(name,"/dtRatio",&D->dtRatio,1);
-      } else	;
-      MPI_Barrier(MPI_COMM_WORLD);
-
-      istart=D->istart;
-      iend=D->iend;
-      jstart=D->jstart;
-      jend=D->jend;
-      minXSub=D->minXSub;
-      minYSub=D->minYSub;
-
-      for(s=0; s<D->nSpecies; s++)
-      {
-
-        if(myrank==0)    {
-          file_id=H5Fopen(name,H5F_ACC_RDWR,H5P_DEFAULT);
-          sprintf(name2,"%dParticle",s);
-          group_id=H5Gcreate2(file_id,name2,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
-          H5Gclose(group_id);
-          H5Fclose(file_id);
-        }  else 	;
-        MPI_Barrier(MPI_COMM_WORLD);
-
-        k=0;
-        cnt=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)
-          {
+    for(s=0; s<D->nSpecies; s++)
+    {
+      cnt=0;
+      for(i=istart; i<iend; i++)
+        for(j=jstart; j<jend; j++)
+          for(k=kstart; k<kend; k++)          {
             p=particle[i][j][k].head[s]->pt;
             while(p)   {
               cnt++;
               p=p->next;
             }
           }
-        MPI_Barrier(MPI_COMM_WORLD);
-        MPI_Gather(&cnt,1,MPI_INT,recv,1,MPI_INT,0,MPI_COMM_WORLD);
-        MPI_Bcast(recv,nTasks,MPI_INT,0,MPI_COMM_WORLD);
+      MPI_Barrier(MPI_COMM_WORLD);
+      MPI_Gather(&cnt,1,MPI_INT,recv,1,MPI_INT,0,MPI_COMM_WORLD);
+      MPI_Bcast(recv,nTasks,MPI_INT,0,MPI_COMM_WORLD);
 
-        start=0;
-        for(i=0; i<myrank; i++)
-          start+=recv[i];
-        totalCnt=0;
-        for(i=0; i<nTasks; i++)
-          totalCnt+=recv[i];
-        saveDouble = (double *)malloc(cnt*sizeof(double ));
-        saveInt = (int *)malloc(cnt*sizeof(int ));
+      start=0;
+      for(i=0; i<myrank; i++)        start+=recv[i];
+      totalCnt=0;
+      for(i=0; i<nTasks; i++)        totalCnt+=recv[i];
+      cntList[s]=totalCnt;
 
-        for(i=0; i<nTasks; i++)   {
-          tmp=0;
-          for(ii=0; ii<i; ii++)
-            tmp+=recv[ii];
-          offSetRank[i]=tmp;
-        }
+      //file space
+      dimsf[0]=totalCnt;
+      dimsf[1]=9;
+      filespace=H5Screate_simple(2,dimsf,NULL);
+      sprintf(dataName,"%d",s);
+      dset_id=H5Dcreate2(file_id,dataName,H5T_NATIVE_DOUBLE,filespace,H5P_DEFAULT,H5P_DEFAULT,H5P_DEFAULT);
 
-        if(myrank==0)  {
-          sprintf(name2,"%dParticle/offSet",s);
-          saveIntMeta(name,name2,offSetRank,nTasks);
-          sprintf(name2,"%dParticle/totalCnt",s);
-          saveIntMeta(name,name2,&totalCnt,1);
-        }    else    ;
+      if(totalCnt>0)
+      {
+        data = (double *)malloc(cnt*9*sizeof(double ));
 
         index=0;
         for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)    {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)    {
-              saveDouble[index]=p->oldX-istart+D->minXSub;
-              index++;
-              p=p->next;
+          for(j=jstart; j<jend; j++)
+            for(k=kstart; k<kend; k++)  {
+              p=particle[i][j][k].head[s]->pt;
+              while(p)    {
+                data[index*9+0]=p->oldX-istart+minXSub;
+                data[index*9+1]=p->oldY-jstart+minYSub;
+                data[index*9+2]=p->oldZ-kstart+minZSub;
+                px=calInterpolation(p->p1Old2,p->p1Old1,p->p1,D->resolX);
+                py=calInterpolation(p->p2Old2,p->p2Old1,p->p2,D->resolX);
+                pz=calInterpolation(p->p3Old2,p->p3Old1,p->p3,D->resolX);
+                data[index*9+3]=px;
+                data[index*9+4]=py;
+                data[index*9+5]=pz;
+                data[index*9+6]=p->index;
+                data[index*9+7]=p->core;
+                data[index*9+8]=p->weight;
+                index++;
+                p=p->next;
+              }
             }
-          }
-        sprintf(name2,"%dParticle/x",s);
-        saveParticleComp_Double(saveDouble,name,name2,totalCnt,cnt,start);
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)    {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)    {
-              saveDouble[index]=p->oldY-jstart+D->minYSub;
-              index++;
-              p=p->next;
-            }
-          }
-        sprintf(name2,"%dParticle/y",s);
-        saveParticleComp_Double(saveDouble,name,name2,totalCnt,cnt,start);
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)    {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)    {
-              saveDouble[index]=p->p1;
-              index++;
-              p=p->next;
-            }
-          }
-        sprintf(name2,"%dParticle/px",s);
-        saveParticleComp_Double(saveDouble,name,name2,totalCnt,cnt,start);
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)    {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)    {
-              saveDouble[index]=p->p2;
-              index++;
-              p=p->next;
-            }
-          }
-        sprintf(name2,"%dParticle/py",s);
-        saveParticleComp_Double(saveDouble,name,name2,totalCnt,cnt,start);
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)    {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)    {
-              saveDouble[index]=p->p3;
-              index++;
-              p=p->next;
-            }
-          }
-        sprintf(name2,"%dParticle/pz",s);
-        saveParticleComp_Double(saveDouble,name,name2,totalCnt,cnt,start);
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)    {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)    {
-              saveDouble[index]=p->weight;
-              index++;
-              p=p->next;
-            }
-          }
-        sprintf(name2,"%dParticle/weight",s);
-        saveParticleComp_Double(saveDouble,name,name2,totalCnt,cnt,start);
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)     {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)      {
-              saveInt[index]=p->index;
-              p=p->next;
-              index++;
-            }
-          }
-        sprintf(name2,"%dParticle/index",s);
-        saveParticleComp_Int(saveInt,name,name2,totalCnt,cnt,start);
-        index=0;
-        for(i=istart; i<iend; i++)
-          for(j=jstart; j<jend; j++)     {
-            p=particle[i][j][k].head[s]->pt;
-            while(p)    {
-              saveInt[index]=p->core;
-              p=p->next;
-              index++;
-            }
-          }
-        sprintf(name2,"%dParticle/core",s);
-        saveParticleComp_Int(saveInt,name,name2,totalCnt,cnt,start);
 
+        //memory space
+        dimsf[0]=cnt;
+        dimsf[1]=9;
+        memspace=H5Screate_simple(2,dimsf,NULL);
 
-        free(saveDouble);
-        free(saveInt);
+        stride[0]=1;
+        stride[1]=1;
+        count[0]=1;
+        count[1]=1;
 
-      }	//End of species
+        //hyperslab in file space
+        block[0]=cnt;
+        block[1]=9;
+        offset[0]=start;
+        offset[1]=0;
+        H5Sselect_hyperslab(filespace,H5S_SELECT_SET,offset,stride,count,block);
 
-    }	//End of switch (dimension)
+        //hyperslab in memory space
+        offset[0]=0;
+        H5Sselect_hyperslab(memspace,H5S_SELECT_SET,offset,stride,count,block);
+      
+        plist_id=H5Pcreate(H5P_DATASET_XFER);
+        H5Pset_dxpl_mpio(plist_id,H5FD_MPIO_INDEPENDENT);
+        H5Dwrite(dset_id, H5T_NATIVE_DOUBLE,memspace,filespace,plist_id,data);
+        H5Pclose(plist_id);
+        H5Sclose(memspace);
+      
+        free(data);
+      }	else	; 	//End of totalCnt>0
+      MPI_Barrier(MPI_COMM_WORLD);
+/*
+      //write meta
+      a_dims=1;
+      as_id=H5Screate_simple(1,&a_dims,NULL);
+      sprintf(dataName,"%dtotalCnt",s);
+//lala
+      attr_id=H5Acreate2(dset_id,dataName,H5T_NATIVE_INT,as_id,H5P_DEFAULT,H5P_DEFAULT);
+      H5Awrite(attr_id,H5T_NATIVE_INT,&totalCnt);
+      H5Aclose(attr_id);
+      H5Sclose(as_id);
+*/
+      H5Dclose(dset_id);
 
-    if(myrank==0)  printf("%s\n",name);  else	;
-
+      H5Sclose(filespace);
+    }	//End of nSpecies
     free(recv);
-    free(offSetRank);
+    H5Fclose(file_id);
+
+    if(myrank==0)  {
+      sprintf(dataName,"nSpecies");
+      saveIntMeta(name,dataName,&D->nSpecies,1);
+      for(s=0; s<D->nSpecies; s++)  {
+        sprintf(dataName,"%dtotalCnt",s);
+        saveIntMeta(name,dataName,&cntList[s],1);
+      }
+      saveIntMeta(name,"/nx",&D->nx,1);
+      saveIntMeta(name,"/ny",&D->ny,1);
+      saveIntMeta(name,"/nz",&D->nz,1);
+      saveIntMeta(name,"/minXDomain",&D->minXDomain,1);
+      saveIntMeta(name,"/minYDomain",&D->minYDomain,1);
+      saveIntMeta(name,"/minZDomain",&D->minZDomain,1);
+    }  else	;
 }
+//lala
+double calInterpolation(double y1,double y2,double y3,double resolX)
+{
+   double a,b,c,dx,x,result;
+
+   a=0.5*(y1+y3)-y2;
+   b=2.0*y2-1.5*y1-0.5*y3;
+   c=y1;
+   dx=1.0/resolX;
+   x=0.5+dx*0.5;
+   result=a*x*x+b*x+c;
+
+   return result;
+}   
+
 
 void saveEDumpHDF(Domain *D,int iteration)
 {
@@ -579,15 +527,10 @@ void saveEDumpHDF(Domain *D,int iteration)
     herr_t status;
     void saveFieldComp();
 
-    nxSub=D->nxSub;
-    nySub=D->nySub;
-    nzSub=D->nzSub;
-    istart=D->istart;
-    iend=nxSub+2;
-    jstart=D->jstart;
-    jend=nySub+2;
-    kstart=D->kstart;
-    kend=nzSub+2;
+    nxSub=D->nxSub;  nySub=D->nySub;  nzSub=D->nzSub;
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
 
     metaDim[0]=1;
 
@@ -613,8 +556,21 @@ void saveEDumpHDF(Domain *D,int iteration)
       saveDoubleMeta(name,"/dtRatio",&D->dtRatio,1);
     } else	;
     MPI_Barrier(MPI_COMM_WORLD);
+    nx=D->nx;        ny=D->ny;        nz=D->nz;
 
     switch((D->fieldType-1)*3+D->dimension) {
+    //1D
+    case (Pukhov-1)*3+1:
+      nx=D->nx+5; 
+      calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
+
+      offset[0]=(D->minXSub-D->minXDomain)+biasX;
+      offset[1]=0;    offset[2]=0;
+      
+      saveFieldComp(D->Ex,name,"/Ex",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Ey,name,"/Ey",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Ez,name,"/Ez",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      break;
     //2D
     case (Pukhov-1)*3+2:
       nx=D->nx+5;
@@ -653,16 +609,10 @@ void saveJDumpHDF(Domain *D,int iteration)
     void saveFieldComp();
     void saveIntMeta();
 
-    nxSub=D->nxSub;
-    nySub=D->nySub;
-    nzSub=D->nzSub;
-    istart=D->istart;
-    iend=nxSub+2;
-    jstart=D->jstart;
-    jend=nySub+2;
-    kstart=D->kstart;
-    kend=nzSub+2;
-
+    nxSub=D->nxSub;  nySub=D->nySub;  nzSub=D->nzSub;
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
     metaDim[0]=1;
 
     sprintf(name,"resolJ%d.h5",iteration);
@@ -687,13 +637,25 @@ void saveJDumpHDF(Domain *D,int iteration)
       saveDoubleMeta(name,"/dtRatio",&D->dtRatio,1);
     }	else	;
     MPI_Barrier(MPI_COMM_WORLD);
+    nx=D->nx;        ny=D->ny;        nz=D->nz;
 
-    switch((D->fieldType-1)*3+D->dimension) {
-    //2D
-    case (Pukhov-1)*3+2:
-      nx=D->nx+5;
+    switch(D->dimension) {
+    //1D
+    case 1 :
+      nx=D->nx+5; 
       calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
-      ny=D->ny+5;
+
+      offset[0]=(D->minXSub-D->minXDomain)+biasX;
+      offset[1]=0;    offset[2]=0;
+      
+      saveFieldComp(D->Jx,name,"/Jx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Jy,name,"/Jy",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Jz,name,"/Jz",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      break;
+    //2D
+    case 2:
+      nx=D->nx+5;  ny=D->ny+5;
+      calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
       calParameter(ny,&jstart,&jend,&nySub,rankY,&biasY,D->M);
 
       offset[0]=(D->minXSub-D->minXDomain)+biasX;
@@ -728,15 +690,10 @@ void saveBDumpHDF(Domain *D,int iteration)
     void saveFieldComp();
     void saveIntMeta();
 
-    nxSub=D->nxSub;
-    nySub=D->nySub;
-    nzSub=D->nzSub;
-    istart=D->istart;
-    iend=nxSub+2;
-    jstart=D->jstart;
-    jend=nySub+2;
-    kstart=D->kstart;
-    kend=nzSub+2;
+    nxSub=D->nxSub;    nySub=D->nySub;    nzSub=D->nzSub;
+    istart=D->istart;    iend=D->iend;
+    jstart=D->jstart;    jend=D->jend;
+    kstart=D->kstart;    kend=D->kend;
 
     metaDim[0]=1;
 
@@ -762,13 +719,25 @@ void saveBDumpHDF(Domain *D,int iteration)
       saveDoubleMeta(name,"/dtRatio",&D->dtRatio,1);
     }	else	;
     MPI_Barrier(MPI_COMM_WORLD);
+    nx=D->nx;  ny=D->ny;  nz=D->nz;
 
     switch((D->fieldType-1)*3+D->dimension) {
-    //2D
-    case (Pukhov-1)*3+2:
+    //1D
+    case (Pukhov-1)*3+1:
       nx=D->nx+5;
       calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
-      ny=D->ny+5;
+
+      offset[0]=(D->minXSub-D->minXDomain)+biasX;
+      offset[1]=0;      offset[2]=0;
+      
+      saveFieldComp(D->Bx,name,"/Bx",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->By,name,"/By",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      saveFieldComp(D->Bz,name,"/Bz",nx,ny,nz,nxSub,nySub,nzSub,istart,iend,jstart,jend,kstart,kend,offset);
+      break;
+    //2D
+    case (Pukhov-1)*3+2:
+      nx=D->nx+5;     ny=D->ny+5;
+      calParameter(nx,&istart,&iend,&nxSub,rankX,&biasX,D->L);
       calParameter(ny,&jstart,&jend,&nySub,rankY,&biasY,D->M);
 
       offset[0]=(D->minXSub-D->minXDomain)+biasX;

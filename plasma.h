@@ -35,6 +35,7 @@ typedef struct _LoadList  {
    double density;
    double numberInCell;
    double criticalDensity;
+   double targetW;
    int index;  
    double num;      //exceeded number of particle which is less than 1
    int xnodes;     //longitudinal point number
